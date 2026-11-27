@@ -1,0 +1,4173 @@
+/* =============================================================
+   课表展示网页 · 全局样式表
+   -------------------------------------------------------------
+   主题：橙 × 蓝 · 流体渐变 + 毛玻璃（Glassmorphism）
+   index.html（可编辑首页）、share.html（只读分享页）、
+   no_identity.html（无身份提示页）共用本文件。
+
+   目录：
+     1. 设计变量
+     2. 基础重置 / 流体渐变背景 / 页面容器
+     3. 标题区与通用玻璃卡片
+     4. 身份栏 / 链接栏
+     5. 按钮（含右下角「去串门」）
+     6. 表单控件
+     7. 周次切换条
+     8. 课表表格 & 课程卡片
+     9. 识图结果确认区
+    10. 只读分享页
+    11. 课程操作按钮 / 顶部控制区 / 弹窗
+    12. 头像 / 上传状态 / 使用教程
+    13. 响应式适配 / 动效降级
+   ============================================================= */
+
+
+/* ===== 1. 设计变量：改这里就能整体换配色 ===== */
+:root {
+    /* 品牌色：亮橙 + 清爽蓝 */
+    --orange: #FF8A00;
+    --orange-strong: #FF5E00;
+    --orange-deep: #C2410C;
+    --orange-soft: rgba(255, 138, 0, .12);
+
+    --blue: #2563EB;
+    --blue-dark: #1D4ED8;
+    --blue-deep: #1E3A8A;
+    --blue-soft: rgba(37, 99, 235, .10);
+
+    /* 文字与分割线（不再出现生硬的黑色表格线） */
+    --text: #1E293B;
+    --text-soft: #475569;
+    --text-muted: #64748B;
+    --line: rgba(148, 163, 184, .18);
+
+    /* 毛玻璃 */
+    --glass: rgba(255, 255, 255, .70);
+    --glass-strong: rgba(255, 255, 255, .82);
+    --glass-soft: rgba(255, 255, 255, .48);
+    --glass-border: rgba(255, 255, 255, .80);
+    --blur: 16px;
+
+    /* 渐变 */
+    --gradient-primary: linear-gradient(135deg, #FF8A00 0%, #FF5E00 100%);
+    --gradient-secondary: linear-gradient(135deg, #3B82F6 0%, #2563EB 55%, #1D4ED8 100%);
+    --gradient-danger: linear-gradient(135deg, #F87171 0%, #DC2626 100%);
+    --gradient-warm: linear-gradient(135deg, #FF8A00 0%, #FF5E00 100%);
+
+    /* 圆角 / 阴影 / 动效 */
+    --radius-lg: 20px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+
+    --shadow-card:
+        0 1px 0 rgba(255, 255, 255, .9) inset,
+        0 2px 6px rgba(30, 58, 138, .05),
+        0 18px 40px -20px rgba(30, 58, 138, .30);
+    --shadow-card-hover:
+        0 1px 0 rgba(255, 255, 255, .95) inset,
+        0 4px 10px rgba(30, 58, 138, .06),
+        0 28px 54px -22px rgba(30, 58, 138, .36),
+        0 18px 36px -26px rgba(255, 94, 0, .42);
+    --shadow-orange: 0 12px 28px -10px rgba(255, 94, 0, .55);
+
+    --ease: cubic-bezier(.22, 1, .36, 1);
+    --transition: all .3s var(--ease);
+}
+
+
+/* ===== 2. 基础重置 / 流体渐变背景 / 页面容器 ===== */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    background-color: #F7FAFF;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(37, 99, 235, .28) transparent;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    position: relative;
+    isolation: isolate;
+    font-family: "Inter", "Noto Sans SC", -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+        "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text);
+    background-color: #F7FAFF;
+    background-image: linear-gradient(135deg, #F5F9FF 0%, #FFFBF4 52%, #F4F8FF 100%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 两团慢慢流动的柔光：浅蓝 + 浅橙，负责整个页面的「流体感」 */
+body::before,
+body::after {
+    content: "";
+    position: fixed;
+    inset: -25%;
+    z-index: -2;
+    pointer-events: none;
+    background:
+        radial-gradient(38% 42% at 16% 18%, rgba(191, 219, 254, .85) 0%, rgba(191, 219, 254, 0) 68%),
+        radial-gradient(34% 36% at 84% 10%, rgba(255, 237, 213, .95) 0%, rgba(255, 237, 213, 0) 66%),
+        radial-gradient(42% 46% at 74% 84%, rgba(191, 219, 254, .80) 0%, rgba(191, 219, 254, 0) 70%),
+        radial-gradient(36% 40% at 20% 90%, rgba(254, 215, 170, .85) 0%, rgba(254, 215, 170, 0) 70%);
+    filter: blur(28px);
+    animation: fluid-drift 30s ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+/* 第二层只放几团很淡的橙蓝光斑，和第一层错开速度，流动更自然 */
+body::after {
+    z-index: -1;
+    inset: -18%;
+    background:
+        radial-gradient(closest-side at 62% 38%, rgba(255, 174, 90, .28), rgba(255, 174, 90, 0) 72%),
+        radial-gradient(closest-side at 34% 66%, rgba(96, 165, 250, .30), rgba(96, 165, 250, 0) 72%),
+        radial-gradient(closest-side at 82% 76%, rgba(147, 197, 253, .22), rgba(147, 197, 253, 0) 74%);
+    filter: blur(56px);
+    animation: fluid-drift-alt 22s ease-in-out infinite alternate;
+}
+
+@keyframes fluid-drift {
+    0%   { transform: translate3d(-2%, -1.5%, 0) scale(1); }
+    50%  { transform: translate3d(1.5%, 1%, 0) scale(1.05); }
+    100% { transform: translate3d(2.5%, -1%, 0) scale(1.02) rotate(.6deg); }
+}
+
+@keyframes fluid-drift-alt {
+    0%   { transform: translate3d(2%, 1%, 0) scale(1.02) rotate(-.4deg); }
+    50%  { transform: translate3d(-1.5%, -2%, 0) scale(1.08); }
+    100% { transform: translate3d(-2.5%, 1.5%, 0) scale(1); }
+}
+
+/* 所有内容都放在这个居中的容器里，浮在柔光之上 */
+.page {
+    position: relative;
+    z-index: 1;
+    max-width: 1180px;
+    margin: 0 auto;
+    /* 底部留白：给右下角固定的「去串门」按钮让位 */
+    padding: 38px 24px 148px;
+}
+
+::selection {
+    color: #0F172A;
+    background: rgba(255, 138, 0, .26);
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(37, 99, 235, .22);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(37, 99, 235, .40);
+    background-clip: content-box;
+}
+
+/* ===== 3. 标题区与通用玻璃卡片 ===== */
+/* 标题区：左边文字、右边「❓ 使用教程」，窄屏自动折行 */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 0 24px;
+}
+
+.page-header-text {
+    flex: 1 1 280px;
+    min-width: 0;
+}
+
+.page-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 8px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--blue);
+}
+
+/* 小标题前面的一颗橙蓝渐变小圆点 */
+.page-eyebrow::before {
+    content: "";
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--orange) 0%, var(--blue) 100%);
+    box-shadow: 0 0 0 4px rgba(255, 138, 0, .12);
+}
+
+/* 大标题：蓝 → 橙的渐变文字。
+   width: fit-content 很关键：h1 默认独占一整行，背景按整行宽度铺，
+   较短的标题只落在渐变最左侧，看起来就是纯深蓝；收缩到文字宽度后，
+   渐变才真正从「我的」的蓝过渡到「课表」的橙。 */
+h1 {
+    width: fit-content;
+    max-width: 100%;
+    margin: 0;
+    padding-bottom: 2px;
+    font-size: 32px;
+    line-height: 1.24;
+    font-weight: 800;
+    letter-spacing: -.025em;
+    color: #1E3A8A;
+    background: linear-gradient(105deg, #1E3A8A 0%, #2563EB 45%, #EA580C 80%, #FF5E00 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.page-subtitle {
+    margin: 8px 0 0;
+    font-size: 13.5px;
+    color: var(--text-soft);
+}
+
+/* ❓ 使用教程：半透明玻璃胶囊，悬浮时点亮成橙色 */
+.tutorial-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--blue-dark);
+    white-space: nowrap;
+    cursor: pointer;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(30, 58, 138, .08), 0 1px 0 rgba(255, 255, 255, .9) inset;
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    transition: var(--transition);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.tutorial-btn:hover {
+    color: #fff;
+    background: var(--gradient-primary);
+    border-color: rgba(255, 255, 255, .70);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-orange);
+}
+
+.tutorial-btn:active {
+    transform: translateY(0) scale(.98);
+}
+
+/* 通用玻璃卡片 */
+.card {
+    position: relative;
+    margin: 0 0 18px;
+    padding: 24px 26px;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    transition: box-shadow .35s var(--ease), transform .35s var(--ease),
+        border-color .35s var(--ease);
+}
+
+.card:hover {
+    border-color: rgba(255, 255, 255, .95);
+    box-shadow: var(--shadow-card-hover);
+}
+
+/* 紧凑版卡片：周次切换条用 */
+.card--compact {
+    padding: 15px 22px;
+}
+
+/* 卡片里的小标题：左侧一条橙蓝渐变竖线 */
+h2 {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: #16233B;
+}
+
+h2::before {
+    content: "";
+    width: 4px;
+    height: 18px;
+    border-radius: 999px;
+    background: linear-gradient(180deg, var(--orange) 0%, var(--blue) 100%);
+    box-shadow: 0 0 10px rgba(255, 138, 0, .35);
+}
+
+/* 说明文字 */
+.hint {
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--text-muted);
+}
+
+.hint strong {
+    color: var(--text-soft);
+}
+
+/* 后端带回来的提示条：玻璃底 + 半透明描边 */
+.alert {
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13.5px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    animation: fade-slide-in .35s var(--ease);
+}
+
+.alert-error {
+    color: #B42318;
+    background: rgba(254, 242, 242, .78);
+    border: 1px solid rgba(248, 113, 113, .35);
+    box-shadow: 0 8px 20px -14px rgba(220, 38, 38, .45);
+}
+
+.alert-success {
+    color: #047857;
+    background: rgba(236, 253, 245, .78);
+    border: 1px solid rgba(52, 211, 153, .35);
+    box-shadow: 0 8px 20px -14px rgba(5, 150, 105, .40);
+}
+
+@keyframes fade-slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* 行内代码（专属码、链接格式等） */
+code {
+    padding: 2px 7px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--blue-dark);
+    background: rgba(37, 99, 235, .10);
+    border: 1px solid rgba(37, 99, 235, .10);
+    border-radius: 7px;
+}
+
+/* 全站浅蓝链接 */
+a {
+    color: var(--blue);
+    text-underline-offset: 3px;
+}
+
+a:hover {
+    color: var(--blue-dark);
+}
+
+/* ===== 4. 身份栏 / 链接栏 ===== */
+#identity-bar {
+    padding-top: 28px;
+}
+
+/* 卡片顶部的一条橙蓝渐变装饰线 */
+#identity-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: linear-gradient(90deg, var(--blue) 0%, #60A5FA 38%, var(--orange) 100%);
+}
+
+.identity-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 4px;
+    font-size: 14px;
+    color: var(--text-soft);
+}
+
+/* 「当前身份」做成浅橙胶囊标签，一眼就能看到 */
+.identity-main .identity-name {
+    padding: 2px 14px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--orange-deep);
+    background: rgba(255, 138, 0, .14);
+    border: 1px solid rgba(255, 138, 0, .18);
+    border-radius: 999px;
+    box-shadow: 0 4px 12px -8px rgba(255, 94, 0, .55);
+}
+
+.identity-main .identity-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* 一行：标签 + 链接输入框 + 复制按钮 + 打开/预览 */
+.link-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 0;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, .46);
+    border: 1px solid rgba(255, 255, 255, .72);
+    border-radius: var(--radius-md);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.link-row .link-label {
+    flex: 0 0 100px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--blue-deep);
+}
+
+.link-row input {
+    flex: 1 1 240px;
+    min-width: 180px;
+    padding: 9px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, .72);
+    border: 1px solid rgba(37, 99, 235, .14);
+    border-radius: 10px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.link-row input:focus {
+    background: rgba(255, 255, 255, .95);
+    border-color: rgba(37, 99, 235, .50);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+
+.link-row a {
+    padding: 6px 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: var(--transition);
+}
+
+.link-row a:hover {
+    color: var(--blue-dark);
+    background: var(--blue-soft);
+}
+
+/* 复制成功后的小提示 */
+#link-tip {
+    min-height: 20px;
+    margin: 8px 0 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #047857;
+    transition: var(--transition);
+}
+
+#link-tip:empty {
+    min-height: 0;
+    margin: 0;
+}
+
+/* ===== 5. 按钮 ===== */
+/* .btn 是通用按钮：添加 / AI 解析 / 上传识别 / 确认保存都用它。
+   橙色渐变 + 胶囊圆角；background-position 里藏着一道扫光，悬浮时自动划过。 */
+.btn,
+.copy-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 21px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: #fff;
+    white-space: nowrap;
+    cursor: pointer;
+    background-color: #FF7A00;
+    background-image:
+        linear-gradient(110deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .34) 48%, rgba(255, 255, 255, 0) 66%),
+        var(--gradient-primary);
+    background-size: 220% 100%, 100% 100%;
+    background-position: 120% 0, 0 0;
+    background-repeat: no-repeat;
+    border: none;
+    border-radius: 999px;
+    box-shadow: 0 8px 20px -10px rgba(255, 94, 0, .65), 0 1px 0 rgba(255, 255, 255, .35) inset;
+    transition: transform .25s var(--ease), box-shadow .3s var(--ease),
+        background-position .75s var(--ease), filter .25s var(--ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn:hover,
+.copy-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    background-position: -60% 0, 0 0;
+    box-shadow: var(--shadow-orange), 0 1px 0 rgba(255, 255, 255, .40) inset;
+    filter: saturate(1.06);
+}
+
+.btn:active,
+.copy-btn:active {
+    transform: translateY(0) scale(.985);
+}
+
+.btn:disabled,
+.copy-btn:disabled {
+    cursor: progress;
+    opacity: .65;
+    transform: none;
+    filter: none;
+    box-shadow: none;
+}
+
+/* 专属免密链接的复制键用蓝色：和橙色主按钮区分开，避免点错 */
+.copy-btn.magic {
+    background-color: #2563EB;
+    background-image:
+        linear-gradient(110deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .30) 48%, rgba(255, 255, 255, 0) 66%),
+        var(--gradient-secondary);
+    box-shadow: 0 8px 20px -10px rgba(37, 99, 235, .70), 0 1px 0 rgba(255, 255, 255, .30) inset;
+}
+
+.copy-btn.magic:hover {
+    box-shadow: 0 14px 30px -12px rgba(37, 99, 235, .70), 0 1px 0 rgba(255, 255, 255, .35) inset;
+}
+
+/* 次要按钮：蓝色玻璃底 */
+.btn-secondary {
+    color: var(--blue-dark);
+    background-color: rgba(37, 99, 235, .10);
+    background-image: none;
+    border: 1px solid rgba(37, 99, 235, .16);
+    box-shadow: none;
+}
+
+.btn-secondary:hover {
+    color: var(--blue-dark);
+    background-color: rgba(37, 99, 235, .18);
+    border-color: rgba(37, 99, 235, .24);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px -12px rgba(37, 99, 235, .55);
+}
+
+.btn-secondary:active {
+    transform: translateY(0) scale(.985);
+}
+
+/* 危险操作按钮：红色渐变，和橙色主按钮明显区分 */
+.btn-danger {
+    background-color: #DC2626;
+    background-image:
+        linear-gradient(110deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .32) 48%, rgba(255, 255, 255, 0) 66%),
+        var(--gradient-danger);
+    box-shadow: 0 8px 20px -10px rgba(220, 38, 38, .65), 0 1px 0 rgba(255, 255, 255, .30) inset;
+}
+
+.btn-danger:hover {
+    box-shadow: 0 14px 30px -12px rgba(220, 38, 38, .68), 0 1px 0 rgba(255, 255, 255, .35) inset;
+}
+
+/* 「去串门」大按钮：固定在右下角，做成手机 App 悬浮导航的质感 */
+.visit-btn {
+    position: fixed;
+    right: 28px;
+    bottom: 28px;
+    z-index: 70;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px 26px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    background-color: #FF7A00;
+    background-image:
+        linear-gradient(110deg, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, .38) 48%, rgba(255, 255, 255, 0) 66%),
+        var(--gradient-warm);
+    background-size: 220% 100%, 100% 100%;
+    background-position: 120% 0, 0 0;
+    background-repeat: no-repeat;
+    border: 1px solid rgba(255, 255, 255, .35);
+    border-radius: 999px;
+    box-shadow: 0 16px 34px -12px rgba(255, 94, 0, .60), 0 1px 0 rgba(255, 255, 255, .35) inset;
+    transition: transform .3s var(--ease), box-shadow .3s var(--ease),
+        background-position .75s var(--ease);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.visit-btn:hover {
+    color: #fff;
+    transform: translateY(-3px) scale(1.02);
+    background-position: -60% 0, 0 0;
+    box-shadow: 0 22px 44px -14px rgba(255, 94, 0, .68), 0 1px 0 rgba(255, 255, 255, .40) inset;
+}
+
+.visit-btn:active {
+    transform: translateY(-1px) scale(.99);
+}
+
+/* ===== 6. 表单控件 ===== */
+form {
+    margin: 0;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="file"],
+select,
+textarea {
+    width: 100%;
+    padding: 10px 13px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: rgba(255, 255, 255, .64);
+    border: 1px solid rgba(148, 163, 184, .28);
+    border-radius: 11px;
+    outline: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color .25s var(--ease), box-shadow .25s var(--ease),
+        background-color .25s var(--ease);
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="file"]:focus,
+select:focus,
+textarea:focus {
+    background: rgba(255, 255, 255, .92);
+    border-color: rgba(37, 99, 235, .55);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+
+textarea {
+    min-height: 108px;
+    line-height: 1.65;
+    resize: vertical;
+}
+
+select {
+    cursor: pointer;
+    /* 去掉系统默认箭头后自己画一个，跨浏览器更统一 */
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 34px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%232563EB' d='M1.4 1.2 6 5.8l4.6-4.6L12 2.6 6 8.6 0 2.6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 13px center;
+}
+
+/* 文件选择框：做成淡淡的虚线框，点起来像 App 里的上传位 */
+input[type="file"] {
+    padding: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: rgba(248, 250, 252, .58);
+    border: 1px dashed rgba(37, 99, 235, .28);
+}
+
+input[type="file"]:hover {
+    background: rgba(224, 242, 254, .55);
+    border-color: rgba(37, 99, 235, .48);
+}
+
+input[type="file"]::file-selector-button {
+    margin-right: 12px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue-dark);
+    cursor: pointer;
+    background: rgba(37, 99, 235, .10);
+    border: none;
+    border-radius: 999px;
+    transition: var(--transition);
+}
+
+input[type="file"]::file-selector-button:hover {
+    background: rgba(37, 99, 235, .18);
+}
+
+/* 一个「标签 + 控件」的竖排组合 */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.field-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-soft);
+}
+
+/* 上传截图：左边文件框、右边按钮，手机上会竖排 */
+.upload-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+.upload-form .field {
+    flex: 1 1 260px;
+}
+
+/* 一句话添加：整块竖排 */
+.stack-form {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+}
+
+.stack-form .btn {
+    align-self: flex-start;
+}
+
+/* 手动添加：自适应栅格，窄屏自动变一列 */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+}
+
+.manual-form .btn {
+    margin-top: 16px;
+}
+
+/* 桌面端把「上传识别」和「一句话添加」并排，省下大量纵向空间 */
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 0 0 18px;
+}
+
+.tools-grid > .card {
+    margin-bottom: 0;
+}
+
+/* 文字链接（取消、打开、预览等） */
+.text-link {
+    padding: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: var(--transition);
+}
+
+.text-link:hover {
+    color: var(--blue-dark);
+    background: var(--blue-soft);
+}
+
+/* ===== 7. 周次切换条 ===== */
+#week-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+}
+
+#week-bar .week-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: var(--text-muted);
+}
+
+/* 滑轨本身做成「蓝 → 橙」的渐变色带 */
+#week-bar input[type="range"] {
+    flex: 1 1 240px;
+    min-width: 160px;
+    height: 6px;
+    padding: 0;
+    background: linear-gradient(90deg, #BFDBFE 0%, #60A5FA 38%, #FFB066 78%, #FF8A00 100%);
+    border: none;
+    border-radius: 999px;
+    outline: none;
+    box-shadow: 0 2px 8px -2px rgba(37, 99, 235, .30) inset;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+/* 滑块圆点：Chrome / Safari / Edge */
+#week-bar input[type="range"]::-webkit-slider-thumb {
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border: 3px solid var(--orange-strong);
+    border-radius: 50%;
+    box-shadow: 0 4px 12px -3px rgba(255, 94, 0, .55);
+    transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+#week-bar input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.12);
+    box-shadow: 0 6px 16px -3px rgba(255, 94, 0, .65);
+}
+
+/* 滑块圆点：Firefox */
+#week-bar input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border: 3px solid var(--orange-strong);
+    border-radius: 50%;
+    box-shadow: 0 4px 12px -3px rgba(255, 94, 0, .55);
+    transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+}
+
+#week-bar #week-label {
+    min-width: 80px;
+    padding: 4px 14px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--orange-deep);
+    text-align: center;
+    background: rgba(255, 138, 0, .12);
+    border: 1px solid rgba(255, 138, 0, .18);
+    border-radius: 999px;
+}
+
+#week-bar #week-tip {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* 「显示所有周次」复选框：做成小胶囊，点文字也能勾选 */
+#week-bar .week-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    font-size: 13px;
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, .50);
+    border: 1px solid rgba(255, 255, 255, .72);
+    border-radius: 999px;
+    cursor: pointer;
+    user-select: none;
+    transition: var(--transition);
+}
+
+#week-bar .week-toggle:hover {
+    color: var(--blue-dark);
+    background: rgba(224, 242, 254, .70);
+    border-color: rgba(37, 99, 235, .22);
+}
+
+#week-bar .week-toggle input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--orange);
+    cursor: pointer;
+}
+
+/* 勾了「显示所有周次」时滑块置灰：保留原来的周数位置，取消勾选就恢复 */
+#week-bar input[type="range"]:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+}
+
+#week-bar input[type="range"]:disabled::-webkit-slider-thumb {
+    border-color: var(--text-muted);
+    box-shadow: none;
+}
+
+#week-bar input[type="range"]:disabled::-moz-range-thumb {
+    border-color: var(--text-muted);
+    box-shadow: none;
+}
+
+/* 不属于当前选中周次的课程：整个卡片隐藏 */
+.course.week-hidden {
+    display: none;
+}
+
+
+/* ===== 8. 课表表格 & 课程卡片 ===== */
+/* 表格外面的玻璃圆角容器：手机上在这里横向滚动 */
+.table-wrap {
+    padding: 10px;
+    overflow-x: auto;
+    background: rgba(255, 255, 255, .56);
+    border: 1px solid rgba(255, 255, 255, .85);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(16px) saturate(145%);
+    -webkit-backdrop-filter: blur(16px) saturate(145%);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(37, 99, 235, .28) transparent;
+}
+
+.table-wrap::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-wrap::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(37, 99, 235, .25);
+    border-radius: 999px;
+}
+
+/* 识别结果表 / 其他表格里再套一层滚动容器时，去掉多余的卡片外观 */
+.table-wrap--plain {
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* ---- 8.1 CSS Grid 课表：固定左侧时间轴 + 连堂课跨行 + 冲突课程并排 ----
+   结构见 templates/_schedule_grid.html：
+     第 1 行 = 表头；上午 1~4 节；「中午」分割行；下午/晚上 5~11 节。
+     行高由 --slot-h / --lunch-h 控制，表头固定 44px（模板里内联写死）。 */
+.schedule-wrap {
+    --axis-w: 64px;
+    --slot-h: 78px;
+    --lunch-h: 26px;
+    padding: 8px;
+}
+
+.schedule-grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--axis-w) repeat(7, minmax(96px, 1fr));
+    gap: 4px;
+    min-width: 820px;
+    align-items: stretch;
+}
+
+/* 表头：星期几 */
+.day-head,
+.grid-corner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue-deep);
+    white-space: nowrap;
+    background: linear-gradient(135deg, rgba(37, 99, 235, .12) 0%, rgba(255, 138, 0, .10) 100%);
+    border: 1px solid rgba(255, 255, 255, .70);
+    border-radius: 10px;
+    box-shadow: 0 2px 6px -3px rgba(37, 99, 235, .25);
+}
+
+/* 左侧时间轴：横向滚动时固定在左边（sticky 相对于 .table-wrap 的滚动视口） */
+.grid-corner,
+.period-axis,
+.lunch-axis {
+    position: sticky;
+    left: 0;
+}
+
+.grid-corner {
+    z-index: 6;
+    font-size: 12px;
+    color: var(--text-muted);
+    /* 横向滚动时星期表头会从下面经过，这里必须是实色，否则会透出「星期三」 */
+    background: linear-gradient(135deg, #E9F2FF 0%, #FFF2E2 100%);
+    letter-spacing: .06em;
+}
+
+.period-axis {
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    overflow: hidden;
+    /* 实色底：课程卡片横向滚动时从时间轴下面经过，不能透出来 */
+    background: #F8FBFF;
+    border: 1px solid rgba(255, 255, 255, .70);
+    border-radius: 10px;
+    box-shadow: 4px 0 10px -8px rgba(30, 58, 138, .45);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.period-number {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--blue-dark);
+}
+
+.period-time {
+    font-size: 9.5px;
+    line-height: 1.3;
+    color: var(--text-muted);
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* 中午分割行：一条横贯全表的淡橙色分隔带 */
+.lunch-axis {
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--orange-deep);
+    letter-spacing: .18em;
+    background: #FFF1DE;
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.lunch-cell {
+    background: linear-gradient(90deg, rgba(255, 196, 128, .16) 0%, rgba(255, 255, 255, .24) 55%, rgba(255, 196, 128, .12) 100%);
+    border-top: 1px dashed rgba(234, 88, 12, .25);
+    border-bottom: 1px dashed rgba(234, 88, 12, .25);
+    border-radius: 8px;
+}
+
+/* 背景空白格：课程卡片会盖在它上面，点一下即可加课 */
+.schedule-grid .empty-cell {
+    z-index: 1;
+    min-width: 0;
+    background: rgba(255, 255, 255, .28);
+    border-radius: 8px;
+}
+
+.schedule-grid .empty-cell:hover {
+    outline-offset: -3px;
+}
+
+/* 课程卡片：按 --lanes / --lane 决定宽度和左边距，同一天冲突的课并排显示 */
+.schedule-grid .course {
+    z-index: 2;
+    justify-self: start;
+    align-self: stretch;
+    justify-content: flex-start;
+    align-items: stretch;
+    width: calc(100% / var(--lanes, 1) - 4px);
+    min-width: 0;
+    min-height: 0;
+    margin: 2px 0 2px calc(100% / var(--lanes, 1) * var(--lane, 0) + 2px);
+    padding: 8px 9px;
+    gap: 2px;
+    overflow: hidden;
+    text-align: left;
+    border-radius: 10px;
+}
+
+/* 可编辑卡片右上角有修改 / 删除按钮，顶部留出按钮的高度，避免压住课程名 */
+.schedule-grid .course--editable {
+    padding-top: 24px;
+}
+
+/* 单节课的格子高度有限，只显示课程名 / 地点 / 周数；连堂课才显示节次范围 */
+.schedule-grid .course:not(.course--block) .course-period {
+    display: none;
+}
+
+.schedule-grid .course .course-name {
+    display: -webkit-box;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 12.5px;
+    line-height: 1.25;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.course-period {
+    font-size: 10.5px;
+    font-weight: 600;
+    line-height: 1.2;
+    opacity: .72;
+}
+
+.schedule-grid .course-weeks,
+.schedule-grid .course-location {
+    max-width: 100%;
+    font-size: 10.5px;
+    line-height: 1.2;
+}
+
+/* 彻底抛弃原生表格边框：用间距 + 圆角色块来区分格子 */
+table {
+    width: 100%;
+    min-width: 860px;
+    margin: 0;
+    border-collapse: separate;
+    border-spacing: 6px;
+}
+
+.schedule-table thead th {
+    padding: 12px 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--blue-deep);
+    text-align: center;
+    white-space: nowrap;
+    background: linear-gradient(135deg, rgba(37, 99, 235, .11) 0%, rgba(255, 138, 0, .10) 100%);
+    border: 1px solid rgba(255, 255, 255, .70);
+    border-radius: 12px;
+    box-shadow: 0 2px 6px -3px rgba(37, 99, 235, .25);
+}
+
+.schedule-table tbody th {
+    padding: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-align: center;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, .40);
+    border: 1px solid rgba(255, 255, 255, .60);
+    border-radius: 10px;
+}
+
+.schedule-table tbody td {
+    height: 78px;
+    padding: 0;
+    vertical-align: middle;
+}
+
+/* 课程卡片：圆角 + 半透明底色 + 内容垂直居中 */
+.course {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 2px;
+    min-height: 66px;
+    /* 右边多留一点：避开右上角的删除小叉号 */
+    padding: 10px 22px 10px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
+    color: #334155;
+    background: rgba(255, 255, 255, .55);
+    border: 1px solid rgba(255, 255, 255, .82);
+    border-radius: 12px;
+    box-shadow: 0 2px 6px -2px rgba(30, 58, 138, .14);
+    transition: transform .28s var(--ease), box-shadow .28s var(--ease);
+}
+
+.course:hover {
+    transform: translateY(-2px) scale(1.012);
+    box-shadow: 0 12px 24px -14px rgba(30, 58, 138, .50), 0 2px 6px -2px rgba(30, 58, 138, .12);
+}
+
+/* 老表格布局里一个格子有多门课时留空隙（Grid 课表用 --lane 并排，不需要） */
+.schedule-table .course + .course {
+    margin-top: 6px;
+}
+
+.course strong,
+.course .course-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    line-height: 1.35;
+    word-break: break-word;
+}
+
+.course-weeks {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: .76;
+}
+
+.course-location {
+    font-size: 11px;
+    opacity: .86;
+    word-break: break-word;
+}
+
+/* 6 组半透明橙蓝色调，由 static/ui.js 按课程名稳定分配（同一门课永远同色） */
+.course.tone-1 {
+    background: linear-gradient(140deg, rgba(219, 234, 254, .92) 0%, rgba(191, 219, 254, .78) 100%);
+    color: #1E3A8A;
+}
+
+.course.tone-2 {
+    background: linear-gradient(140deg, rgba(255, 237, 213, .95) 0%, rgba(254, 215, 170, .82) 100%);
+    color: #9A3412;
+}
+
+.course.tone-3 {
+    background: linear-gradient(140deg, rgba(224, 242, 254, .94) 0%, rgba(186, 230, 253, .80) 100%);
+    color: #0C4A6E;
+}
+
+.course.tone-4 {
+    background: linear-gradient(140deg, rgba(255, 228, 204, .95) 0%, rgba(253, 186, 116, .72) 100%);
+    color: #7C2D12;
+}
+
+.course.tone-5 {
+    background: linear-gradient(140deg, rgba(226, 232, 255, .94) 0%, rgba(199, 210, 254, .80) 100%);
+    color: #3730A3;
+}
+
+.course.tone-6 {
+    background: linear-gradient(140deg, rgba(255, 246, 220, .95) 0%, rgba(253, 224, 171, .80) 100%);
+    color: #854D0E;
+}
+
+/* 课程卡片上的小按钮（× 删除 / ✏️ 修改）：平时低调，鼠标移上去才变色 */
+.delete-btn,
+.edit-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 6px;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: rgba(255, 255, 255, .60);
+    border: 1px solid rgba(255, 255, 255, .72);
+    border-radius: 999px;
+    transition: var(--transition);
+}
+
+.delete-btn:hover {
+    color: #DC2626;
+    background: rgba(254, 226, 226, .90);
+    border-color: rgba(248, 113, 113, .35);
+}
+
+.edit-btn:hover {
+    color: var(--blue-dark);
+    background: rgba(219, 234, 254, .90);
+    border-color: rgba(37, 99, 235, .25);
+}
+
+/* 第一次点了删除键、等待二次确认时的样子 */
+.delete-btn.armed {
+    font-size: 11px;
+    color: #DC2626;
+    white-space: nowrap;
+    background: rgba(254, 226, 226, .95);
+    border-color: rgba(248, 113, 113, .45);
+}
+
+/* 课程卡片里的操作按钮（✏️ 修改 / × 删除）并排放在右上角 */
+.course .delete-btn,
+.course .edit-btn {
+    position: static;
+    min-width: 18px;
+    height: 18px;
+    padding: 0;
+    font-size: 12px;
+    color: rgba(30, 41, 59, .55);
+    background: rgba(255, 255, 255, .72);
+    border: 1px solid rgba(255, 255, 255, .65);
+}
+
+.course .delete-btn {
+    font-size: 13px;
+}
+
+.course .delete-btn:hover {
+    color: #DC2626;
+    background: rgba(254, 226, 226, .96);
+}
+
+.course .edit-btn:hover {
+    color: var(--blue-dark);
+    background: rgba(219, 234, 254, .96);
+}
+
+/* 空白格子：鼠标移上去出现浅蓝虚线框 + 淡色背景，提示「可点击」 */
+.empty-cell {
+    position: relative;
+    cursor: pointer;
+    background: rgba(255, 255, 255, .28);
+    border-radius: 10px;
+    transition: var(--transition);
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 悬浮时中间浮出一个淡淡的「＋」 */
+.empty-cell::after {
+    content: "＋";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: rgba(37, 99, 235, .55);
+    opacity: 0;
+    transition: opacity .25s var(--ease), transform .25s var(--ease);
+    transform: scale(.85);
+    pointer-events: none;
+}
+
+.empty-cell:hover {
+    background: rgba(224, 242, 254, .72);
+    outline: 2px dashed rgba(37, 99, 235, .35);
+    outline-offset: -4px;
+}
+
+.empty-cell:hover::after {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* 已经弹出兜底输入框时，别让「＋」压在输入框上面 */
+.empty-cell.has-input::after {
+    display: none;
+}
+
+/* prompt 被浏览器屏蔽时，格子里出现的兜底输入框 */
+input.cell-input {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
+}
+
+
+/* ===== 9. 识图结果确认区 ===== */
+#confirm-box {
+    padding: 24px 26px;
+    background: linear-gradient(135deg, rgba(255, 247, 237, .86) 0%, rgba(255, 255, 255, .72) 58%, rgba(239, 246, 255, .78) 100%);
+    border: 1px solid rgba(255, 174, 90, .38);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .9) inset,
+        0 18px 40px -22px rgba(255, 94, 0, .35),
+        0 12px 30px -24px rgba(30, 58, 138, .30);
+}
+
+#confirm-box h2::before {
+    background: linear-gradient(180deg, var(--orange) 0%, #FFB066 55%, var(--blue) 100%);
+}
+
+#confirm-box .hint {
+    margin: 0 0 14px;
+}
+
+#confirm-box .hint strong {
+    color: var(--orange-deep);
+}
+
+.confirm-table {
+    min-width: 720px;
+    /* 确认表用极淡的分割线，不再是一格一框的硬边 */
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.confirm-table thead th {
+    padding: 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #9A3412;
+    text-align: left;
+    white-space: nowrap;
+    background: rgba(255, 237, 213, .72);
+    border: 1px solid rgba(255, 255, 255, .60);
+    border-radius: 10px;
+}
+
+.confirm-table tbody td {
+    padding: 6px 4px;
+    vertical-align: middle;
+    border-bottom: 1px solid rgba(148, 163, 184, .14);
+}
+
+.confirm-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.confirm-table tbody tr {
+    transition: background-color .25s var(--ease);
+}
+
+.confirm-table tbody tr:hover {
+    background: rgba(255, 255, 255, .38);
+}
+
+.confirm-table input,
+.confirm-table select {
+    padding: 8px 10px;
+    font-size: 13px;
+    border-radius: 9px;
+}
+
+.confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin: 18px 0 0;
+}
+
+/* ===== 10. 只读分享页 ===== */
+.readonly-tip {
+    margin: 8px 0 0;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.viewer-card {
+    padding: 18px 22px;
+}
+
+.viewer-tip {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text-soft);
+}
+
+.viewer-tip strong {
+    color: var(--blue-dark);
+}
+
+.viewer-tip a {
+    font-weight: 600;
+    color: var(--blue);
+    text-decoration: none;
+    border-radius: 6px;
+    transition: var(--transition);
+}
+
+.viewer-tip a:hover {
+    color: var(--blue-dark);
+    background: var(--blue-soft);
+}
+
+.viewer-tip code {
+    padding: 2px 7px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--blue-dark);
+    background: rgba(37, 99, 235, .10);
+    border: 1px solid rgba(37, 99, 235, .10);
+    border-radius: 6px;
+}
+
+/* 手机上才出现的「左右滑动」提示 */
+.scroll-hint {
+    display: none;
+    margin: 0 0 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* 只读页底部没有固定的「去串门」按钮，底部留白可以小一些 */
+.readonly-page .page {
+    padding-bottom: 64px;
+}
+
+
+/* ===== 11. 课程操作按钮 / 顶部控制区 / 弹窗 ===== */
+
+/* --- 11.1 课程卡片右上角的 ✏️ + × --- */
+.course-actions {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    display: flex;
+    gap: 3px;
+    opacity: .5;
+    transition: var(--transition);
+}
+
+/* 鼠标移上去 / 键盘 Tab 到按钮上时才完全显现，平时不抢课表的风头 */
+.course:hover .course-actions,
+.course-actions:focus-within {
+    opacity: 1;
+}
+
+/* 右上角有两个按钮，右边要多留一点，别让按钮压住课程名 */
+.course--editable {
+    padding-right: 48px;
+}
+
+/* 触屏设备没有 hover，按钮就一直显示，否则手机上根本点不到 */
+@media (hover: none) {
+    .course-actions {
+        opacity: 1;
+    }
+}
+
+/* --- 11.2 顶部控制区（一键清空我的课表） --- */
+.control-bar-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.control-bar-text {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.control-title {
+    display: block;
+    font-size: 14px;
+    color: var(--text);
+}
+
+.control-hint {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--text-muted);
+}
+
+.control-hint strong {
+    color: var(--text-soft);
+}
+
+.control-form {
+    flex: none;
+}
+
+/* --- 11.3 身份栏里的「✏️ 修改昵称」小按钮 --- */
+.name-edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: var(--blue-dark);
+    cursor: pointer;
+    background: var(--blue-soft);
+    border: 1px solid rgba(37, 99, 235, .12);
+    border-radius: 999px;
+    transition: var(--transition);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.name-edit-btn:hover {
+    background: rgba(37, 99, 235, .18);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px -10px rgba(37, 99, 235, .55);
+}
+
+.name-edit-btn:active {
+    transform: none;
+}
+
+/* --- 11.4 弹窗（毛玻璃遮罩 + 玻璃卡片） --- */
+/* 弹窗打开时锁住背景滚动，避免手机上一滑动就把弹窗滑走 */
+body.modal-open {
+    overflow: hidden;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, .32);
+    backdrop-filter: blur(8px) saturate(120%);
+    -webkit-backdrop-filter: blur(8px) saturate(120%);
+    animation: modal-fade .18s ease;
+}
+
+/* ★ 必须写这一条：上面的 display: flex 会盖掉 hidden 属性默认的 display: none */
+.modal-backdrop[hidden] {
+    display: none;
+}
+
+.modal {
+    width: 100%;
+    max-width: 420px;
+    max-height: calc(100vh - 40px);
+    padding: 24px;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, .82);
+    border: 1px solid rgba(255, 255, 255, .90);
+    border-radius: 22px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .95) inset,
+        0 40px 90px -30px rgba(30, 58, 138, .50),
+        0 24px 50px -32px rgba(255, 94, 0, .35);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    animation: modal-pop .22s var(--ease);
+}
+
+.modal h2 {
+    margin: 0 0 6px;
+    font-size: 17px;
+}
+
+.modal-subtitle {
+    margin: 0 0 16px;
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--text-soft);
+}
+
+.modal .field {
+    display: block;
+    margin-bottom: 12px;
+}
+
+.modal .field-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-soft);
+}
+
+.modal-hint {
+    margin: 0 0 16px;
+    font-size: 12px;
+    line-height: 1.75;
+    color: var(--text-muted);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.modal-actions .btn {
+    min-width: 96px;
+    padding: 10px 18px;
+}
+
+/* 清空确认框：标题用红色，视觉上就提示「这是危险操作」 */
+.modal--danger h2 {
+    color: #DC2626;
+}
+
+@keyframes modal-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes modal-pop {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ===== 12. 头像 / 截图压缩状态 / 使用教程 =====
+   12.1 身份栏头像：<label> 包着圆圈，点一下等于点隐藏的 file 输入框
+   12.2 截图上传的状态行（压缩中 / 已压缩 / 压缩失败）
+   12.3 使用教程弹窗（顶部「❓ 使用教程」打开）
+   这三块只有 index.html 用到。 */
+
+/* --- 12.1 头像 --- */
+.avatar-picker {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.avatar-frame {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    overflow: hidden;
+    color: #fff;
+    background: var(--gradient-primary);
+    border: 2px solid rgba(255, 255, 255, .92);
+    border-radius: 50%;
+    box-shadow: 0 8px 18px -8px rgba(255, 94, 0, .60), 0 1px 0 rgba(255, 255, 255, .5) inset;
+    transition: var(--transition);
+}
+
+/* 不管原图是长条还是方的，都裁成正方形填满圆圈 */
+.avatar-frame img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* 没上传过头像时显示昵称首字母 */
+.avatar-initial {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    user-select: none;
+}
+
+/* 占位状态用浅蓝玻璃底 + 品牌蓝字母，比一整块渐变橙更轻 */
+.avatar-frame--empty {
+    color: var(--blue-dark);
+    background: rgba(224, 242, 254, .80);
+    border-color: rgba(255, 255, 255, .92);
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, .14), 0 6px 14px -10px rgba(37, 99, 235, .45);
+}
+
+.avatar-picker:hover .avatar-frame,
+.avatar-picker:focus-within .avatar-frame {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 12px 24px -10px rgba(255, 94, 0, .60), 0 1px 0 rgba(255, 255, 255, .55) inset;
+}
+
+/* 右下角的 📷 小徽标：提示这里可以点 */
+.avatar-badge {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    line-height: 1;
+    background: rgba(255, 255, 255, .95);
+    border: 1px solid rgba(255, 255, 255, .9);
+    border-radius: 50%;
+    box-shadow: 0 3px 8px -3px rgba(15, 23, 42, .35);
+}
+
+/* 真正的 file 输入框要藏起来，但不能用 display: none
+   （那样点 label 有些浏览器不弹选择框），所以用「1px + 透明」的老办法 */
+.avatar-form input[type="file"] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* 头像上传后的提示：成功绿色，失败红色 */
+.avatar-tip {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #047857;
+    transition: var(--transition);
+}
+
+.avatar-tip:empty {
+    display: none;
+}
+
+.avatar-tip--error {
+    color: #B42318;
+}
+
+/* 屏幕上不显示，但读屏软件和键盘能「看到」（给头像的隐藏说明文字用） */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* --- 12.2 截图上传的状态行（选图 / 压缩中 / 已压缩 / 压缩失败） --- */
+.upload-status {
+    margin: 10px 0 0;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: var(--blue-dark);
+    word-break: break-all;
+}
+
+.upload-status:empty {
+    display: none;
+}
+
+.upload-status--error {
+    color: #B42318;
+}
+
+/* --- 12.3 使用教程弹窗 --- */
+/* 比确认框宽一点：说明书要放得下，太窄会拉得很长 */
+.modal--tutorial {
+    max-width: 580px;
+}
+
+.tutorial-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.modal--tutorial h2 {
+    margin: 0;
+}
+
+/* 右上角的 × ：玻璃圆钮，悬浮时点亮橙红 */
+.modal-close {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    font-family: inherit;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    background: rgba(255, 255, 255, .60);
+    border: 1px solid rgba(255, 255, 255, .80);
+    border-radius: 50%;
+    transition: var(--transition);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.modal-close:hover {
+    color: var(--orange-deep);
+    background: rgba(255, 138, 0, .14);
+    border-color: rgba(255, 138, 0, .25);
+    transform: rotate(90deg);
+}
+
+/* 教程比较长：让「我明白了」吸在弹窗底部，滚到一半也能直接点 */
+.modal--tutorial .modal-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: 0;
+    padding: 12px 0 4px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, .92) 45%);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.tutorial-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 0 16px;
+}
+
+.tutorial-section {
+    padding: 15px 17px;
+    background: rgba(255, 255, 255, .50);
+    border: 1px solid rgba(255, 255, 255, .80);
+    border-radius: var(--radius-md);
+    box-shadow: 0 6px 18px -16px rgba(30, 58, 138, .40);
+    transition: var(--transition);
+}
+
+.tutorial-section:hover {
+    background: rgba(255, 255, 255, .66);
+    border-color: rgba(255, 255, 255, .95);
+}
+
+/* 「添加到主屏幕 / 安装到桌面」这两块用浅蓝底，和前面「怎么加课」区分开 */
+.tutorial-section--install {
+    background: rgba(224, 242, 254, .55);
+    border-color: rgba(191, 219, 254, .80);
+}
+
+.tutorial-section--install:hover {
+    background: rgba(224, 242, 254, .72);
+}
+
+.tutorial-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #16233B;
+}
+
+/* 标题前面的小圆序号：橙色渐变小球 */
+.tutorial-index {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 21px;
+    height: 21px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--gradient-primary);
+    border-radius: 50%;
+    box-shadow: 0 4px 10px -6px rgba(255, 94, 0, .70);
+}
+
+.tutorial-section p {
+    margin: 0 0 8px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--text-soft);
+}
+
+.tutorial-section p:last-child,
+.tutorial-section dl:last-child {
+    margin-bottom: 0;
+}
+
+/* 编号步骤：桌面端用 ol 的序号，移动端也照样清楚 */
+.tutorial-steps {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--text-soft);
+}
+
+.tutorial-steps li + li {
+    margin-top: 4px;
+}
+
+.tutorial-steps strong {
+    color: var(--text);
+}
+
+/* 示例文字：半透明白底虚线框，像代码块，一眼看出「照着这样粘贴」 */
+.tutorial-section .tutorial-example {
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.9;
+    color: #334155;
+    word-break: break-all;
+    background: rgba(255, 255, 255, .78);
+    border: 1px dashed rgba(37, 99, 235, .28);
+    border-radius: 10px;
+}
+
+/* 补充说明：更小更淡 */
+.tutorial-section .tutorial-note {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* 高亮小提示（比如「添加到主屏幕时用专属免密链接」） */
+.tutorial-section .tutorial-key {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--orange-deep);
+    background: rgba(255, 237, 213, .80);
+    border: 1px solid rgba(255, 174, 90, .30);
+    border-radius: 9px;
+}
+
+/* 分平台说明：左边粗体是平台，右边是操作步骤 */
+.tutorial-dl {
+    margin: 0;
+    font-size: 12.5px;
+    line-height: 1.8;
+}
+
+.tutorial-dl dt {
+    margin-top: 8px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.tutorial-dl dt:first-child {
+    margin-top: 0;
+}
+
+.tutorial-dl dd {
+    margin: 2px 0 0;
+    color: var(--text-soft);
+}
+
+/* ===== 13. 响应式适配 / 动效降级 ===== */
+
+/* 桌面端鼠标悬浮时，卡片轻轻上浮；触屏不触发，避免「点了还浮着」 */
+@media (hover: hover) and (pointer: fine) {
+    .card:hover {
+        transform: translateY(-2px);
+    }
+}
+
+/* 键盘 / 读屏用户也能看清焦点 */
+a:focus-visible,
+button:focus-visible,
+.week-toggle:focus-within,
+.avatar-picker:focus-within {
+    outline: 2px solid rgba(37, 99, 235, .55);
+    outline-offset: 3px;
+}
+
+@media (max-width: 860px) {
+    .tools-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .table-wrap {
+        padding: 6px;
+    }
+}
+
+/* 朋友多半是手机打开，重点照顾 */
+@media (max-width: 720px) {
+    body {
+        font-size: 14px;
+    }
+
+    .page {
+        /* 底部留出固定「去串门」按钮的高度 + 刘海屏安全区 */
+        padding: 22px 14px calc(122px + env(safe-area-inset-bottom, 0px));
+    }
+
+    h1 {
+        font-size: 24px;
+    }
+
+    .page-header {
+        margin-bottom: 16px;
+        gap: 10px;
+    }
+
+    .page-subtitle {
+        font-size: 12.5px;
+    }
+
+    .tutorial-btn {
+        padding: 8px 15px;
+        font-size: 12.5px;
+    }
+
+    .card {
+        padding: 18px 16px;
+        border-radius: 18px;
+        margin-bottom: 14px;
+    }
+
+    .card--compact {
+        padding: 14px 16px;
+    }
+
+    h2 {
+        font-size: 15px;
+        margin-bottom: 12px;
+    }
+
+    /* 身份栏：所有行都竖排，输入框和按钮占满整行 */
+    .identity-main {
+        gap: 6px;
+        font-size: 13px;
+    }
+
+    .identity-main .identity-hint {
+        flex-basis: 100%;
+        font-size: 11.5px;
+    }
+
+    .link-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .link-row .link-label {
+        flex: none;
+    }
+
+    .link-row input {
+        flex: none;
+        width: 100%;
+        min-width: 0;
+        font-size: 12.5px;
+    }
+
+    .link-row .copy-btn {
+        width: 100%;
+        padding: 11px 18px;
+    }
+
+    .link-row a {
+        display: block;
+        padding: 4px 0;
+        text-align: center;
+    }
+
+    /* 表单：竖排 + 按钮铺满，手指好点 */
+    .upload-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .upload-form .field {
+        flex: none;
+        width: 100%;
+    }
+
+    .form-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 12px;
+    }
+
+    .btn,
+    .upload-form .btn,
+    .stack-form .btn,
+    .manual-form .btn {
+        width: 100%;
+        align-self: stretch;
+        padding: 12px 18px;
+        font-size: 14px;
+    }
+
+    /* 周次条：第一行标题 + 周数，第二行滑块，第三行提示 */
+    #week-bar {
+        gap: 10px;
+    }
+
+    #week-bar .week-title {
+        order: 1;
+    }
+
+    #week-bar #week-label {
+        order: 2;
+        margin-left: auto;
+    }
+
+    #week-bar input[type="range"] {
+        order: 3;
+        flex: 1 1 100%;
+    }
+
+    #week-bar #week-tip {
+        order: 4;
+        flex-basis: 100%;
+    }
+
+    /* 表格靠外层横向滑动，内部的卡片略微收紧 */
+    table {
+        min-width: 780px;
+    }
+
+    /* Grid 课表：手机上收紧时间轴和行高，一屏能多看到几节课 */
+    .schedule-wrap {
+        --axis-w: 52px;
+        --slot-h: 68px;
+        --lunch-h: 22px;
+        padding: 6px;
+    }
+
+    .schedule-grid {
+        grid-template-columns: var(--axis-w) repeat(7, minmax(84px, 1fr));
+        gap: 3px;
+        min-width: 740px;
+    }
+
+    .day-head,
+    .grid-corner {
+        padding: 0 4px;
+        font-size: 11.5px;
+        border-radius: 8px;
+    }
+
+    .grid-corner {
+        font-size: 10.5px;
+    }
+
+    .period-axis,
+    .lunch-axis,
+    .lunch-cell {
+        border-radius: 8px;
+    }
+
+    .period-number {
+        font-size: 13.5px;
+    }
+
+    .period-time {
+        font-size: 8.5px;
+    }
+
+    .schedule-grid .course {
+        padding: 6px 7px;
+        border-radius: 8px;
+    }
+
+    .schedule-grid .course--editable {
+        padding-top: 22px;
+    }
+
+    .course-actions {
+        top: 2px;
+        right: 2px;
+        gap: 2px;
+    }
+
+    .delete-btn,
+    .edit-btn {
+        min-width: 18px;
+        height: 18px;
+        padding: 0 3px;
+        font-size: 11px;
+    }
+
+    .schedule-grid .course .course-name {
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .course-period,
+    .schedule-grid .course-weeks,
+    .schedule-grid .course-location {
+        font-size: 9.5px;
+        line-height: 1.2;
+    }
+
+    .schedule-table thead th {
+        padding: 10px 6px;
+        font-size: 12px;
+    }
+
+    .schedule-table tbody td {
+        height: 68px;
+    }
+
+    .course {
+        min-height: 58px;
+        padding: 8px 20px 8px 8px;
+    }
+
+    .course strong,
+    .course .course-name {
+        font-size: 12.5px;
+    }
+
+    .scroll-hint {
+        display: block;
+    }
+
+    /* 「去串门」变成底部通栏导航条，跟手机 App 一样 */
+    .visit-btn {
+        right: 14px;
+        bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        left: 14px;
+        padding: 14px 18px;
+        font-size: 14.5px;
+        border-radius: 16px;
+        box-shadow: 0 14px 30px -12px rgba(255, 94, 0, .60);
+    }
+
+    /* 弹窗改成「底部玻璃抽屉」：从下面滑上来，拇指更容易够到按钮 */
+    .modal-backdrop {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .modal {
+        max-width: none;
+        max-height: 88vh;
+        padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+        border-radius: 22px 22px 0 0;
+    }
+
+    /* 两个按钮各占一半，别一个撑满整行把另一个挤没了 */
+    .modal-actions .btn {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
+    }
+
+    .control-bar-main {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    /* 竖排时 flex-basis 会变成高度：桌面端的 260px 基准必须清掉，
+       否则「课表管理」卡片里会空出一大截，按钮被推到很远的下方 */
+    .control-bar-text {
+        flex: none;
+        width: 100%;
+    }
+
+    .control-form .btn {
+        width: 100%;
+    }
+
+    .name-edit-btn {
+        align-self: flex-start;
+    }
+
+    .modal--tutorial {
+        max-height: 92vh;
+    }
+
+    .tutorial-section {
+        padding: 12px 13px;
+    }
+
+    .avatar-frame {
+        width: 46px;
+        height: 46px;
+    }
+
+    .avatar-initial {
+        font-size: 19px;
+    }
+}
+
+/* 更小的手机：再收紧一点间距 */
+@media (max-width: 380px) {
+    h1 {
+        font-size: 21px;
+    }
+
+    .page {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .card {
+        padding: 16px 14px;
+    }
+}
+
+/* ---- 13.1 手机端课表（≤ 768px）：列宽保底 + 卡片瘦身 + 顺滑横滑 ----
+   窄屏上如果让 7 列按屏幕宽度均分，每列只剩 40~50px，
+   课程名会被压成竖排的细长条。这里的思路是「不让它挤」：
+     · 每列给一个硬保底宽度 --day-min，整个网格因此比屏幕宽；
+     · 多出来的宽度交给 .schedule-wrap 横向滚动消化；
+     · 左侧时间轴继续 sticky，滚动时钉在最左边。 */
+@media (max-width: 768px) {
+    /* ① 滚动容器：只吃横向滑动，不把滚动链传给页面 / 浏览器手势 */
+    .schedule-wrap {
+        --axis-w: 46px;    /* 左侧时间轴：够放「08:00 / 09:35」两行小字 */
+        --day-min: 90px;   /* ★ 每天的最小列宽：卡片不再被压扁 */
+        --slot-h: 80px;    /* 单节课行高：隐藏节次行后仍放得下三行字 */
+        --lunch-h: 26px;
+        --col-gap: 4px;
+
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;   /* 万一外层变成 flex / grid 子项，也不会被内容顶宽 */
+        /* 横向内边距必须为 0：滚动容器的裁剪边界是 padding box，
+           留了左右内边距的话，课程卡片横向滑动时会画在这条缝里，
+           而 sticky 时间轴只能贴到内容盒左边，于是左侧会露出 4~5px 卡片。
+           上下内边距留着，让表格和上方的「左右滑动」提示有呼吸空间。 */
+        padding: 4px 0;
+        overflow-x: auto;
+        /* 滑到头也不触发「返回上一页」的边缘手势 / 下拉刷新 */
+        overscroll-behavior-x: contain;
+        /* iOS 惯性滚动，跟手度明显更好 */
+        -webkit-overflow-scrolling: touch;
+        /* 去掉双击缩放的延迟（双指缩放仍然可用） */
+        touch-action: manipulation;
+        /* 键盘 Tab / JS 滚动到某个格子时，别让它被 sticky 的时间轴挡住 */
+        scroll-padding-left: calc(var(--axis-w) + 8px);
+    }
+
+    /* ② 7 天列：最小 90px，屏幕再窄也不会低于这个值，
+          剩下的宽度交给横向滚动，而不是继续压缩列宽 */
+    .schedule-grid {
+        grid-template-columns: var(--axis-w) repeat(7, minmax(var(--day-min), 1fr));
+        gap: var(--col-gap);
+        /* 1 根时间轴 + 7 列 + 8 个间距（每列右侧各一个） */
+        min-width: calc(var(--axis-w) + var(--day-min) * 7 + var(--col-gap) * 8);
+        width: 100%;
+    }
+
+    /* ③ 左侧时间轴：sticky 钉在左边，必须有实色底 + 右侧投影，
+          才挡得住从下面滑过去的课程卡片。
+          left 取 -1px：贴住滚动容器裁剪边（少一点像素级缝隙，
+          否则卡片会从裁剪边和胶囊之间挤出一条 1px 的竖线）。 */
+    .grid-corner,
+    .period-axis,
+    .lunch-axis {
+        position: sticky;
+        left: -1px;
+    }
+
+    .grid-corner {
+        z-index: 8;
+    }
+
+    .schedule-wrap .period-axis,
+    .schedule-wrap .lunch-axis {
+        z-index: 7;
+        /* 实色底：横向滚动时课程卡片会从时间轴下面经过，不能透出来。
+           用 .schedule-wrap 提高优先级，免得被后面「关掉毛玻璃」的媒体查询
+           改成 97% 白（backdrop-filter 关掉后那 3% 是会透的） */
+        background: #F8FBFF;
+        box-shadow: 6px 0 10px -8px rgba(15, 23, 42, .45);
+        /* 下面::before 那块补缝的衬底要能露到胶囊外面；
+           时间轴里的字都很短，不需要 overflow:hidden 兜底 */
+        overflow: visible;
+    }
+
+    .schedule-wrap .lunch-axis {
+        background: #FFF1DE;
+    }
+
+    /* 时间轴单元格之间那 4px 栅格缝隙里也会漏出卡片（sticky 只盖住自己那一格），
+       给每个轴格子加一块「衬底」：向上/下各溢出 2px 盖住缝隙。
+       z-index:-1 让它只出现在胶囊自己的圆角之外，不影响格内文字。 */
+    .schedule-wrap .period-axis::before,
+    .schedule-wrap .lunch-axis::before {
+        content: "";
+        position: absolute;
+        top: -2px;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        z-index: -1;
+        background: inherit;
+        pointer-events: none;
+    }
+
+    /* ④ 表头与时间轴的字号：列宽够了，字也可以大方一点 */
+    .day-head {
+        padding: 0 4px;
+        font-size: 12.5px;
+        letter-spacing: .02em;
+    }
+
+    .grid-corner {
+        padding: 0 4px;
+        font-size: 10.5px;
+    }
+
+    .period-number {
+        font-size: 13px;
+    }
+
+    .period-time {
+        font-size: 8.5px;
+    }
+
+    /* ⑤ 课程卡片：删掉挤占空间的内容，只留真正要看的三行 ---------- */
+    .schedule-grid .course {
+        gap: 1px;
+        padding: 6px 7px;
+        border-radius: 9px;
+    }
+
+    /* 连堂课的高度已经表达「第 1-2 节」，手机端不再重复这行字 */
+    .schedule-grid .course .course-period {
+        display: none;
+    }
+
+    /* 课程名：允许换行，单节课最多两行，连堂课卡片更高、可以多一行 */
+    .schedule-grid .course .course-name {
+        font-size: 12px;
+        line-height: 1.22;
+        -webkit-line-clamp: 2;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    .schedule-grid .course--block .course-name {
+        -webkit-line-clamp: 4;
+    }
+
+    /* 地点：一行放不下就用省略号，绝不撑破卡片 */
+    .schedule-grid .course .course-location {
+        max-width: 100%;
+        font-size: 9.5px;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        word-break: normal;
+    }
+
+    /* 周次：更小、更淡，安静地待在最后一行 */
+    .schedule-grid .course .course-weeks {
+        max-width: 100%;
+        font-size: 9px;
+        line-height: 1.2;
+        color: var(--text-muted);
+        opacity: .62;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 深色主题（终末地）里用主题自己的灰，别用浅色主题的 --text-muted */
+    body.theme-endfield .schedule-grid .course .course-weeks {
+        color: var(--end-text-muted);
+        opacity: .85;
+    }
+
+    /* ⑥ 右上角 ✏️ / ×：缩到 16px 贴角，正文只需让出顶部一条，不再缩右边 */
+    .schedule-grid .course--editable {
+        padding: 18px 6px 5px;
+    }
+
+    .course-actions {
+        top: 2px;
+        right: 2px;
+        gap: 6px;
+        opacity: .92;
+    }
+
+    .course .course-actions .edit-btn,
+    .course .course-actions .delete-btn {
+        position: relative;
+        min-width: 16px;
+        height: 16px;
+        padding: 0;
+        font-size: 10px;
+        border-radius: 6px;
+    }
+
+    /* 视觉上只有 16px，触摸热区用伪元素向四周放大 3px，手指更容易点中 */
+    .course .course-actions .edit-btn::before,
+    .course .course-actions .delete-btn::before {
+        content: "";
+        position: absolute;
+        inset: -3px;
+    }
+
+    /* ⑥' 同一天有冲突课并排时（模板里的 .course--crowded），卡片只剩半列宽。
+          再瘦一档：字缩小、按钮收到 13px，保证「课程名 + ✏️ + ×」都还塞得下；
+          真有 4 张以上并排时最窄，那时只能靠点开编辑弹窗看完整信息。 */
+    .schedule-grid .course--crowded {
+        gap: 0;
+        padding: 3px 3px 2px;
+    }
+
+    .schedule-grid .course--editable.course--crowded {
+        padding-top: 14px;
+    }
+
+    .schedule-grid .course--crowded .course-name {
+        font-size: 10.5px;
+        line-height: 1.18;
+        -webkit-line-clamp: 3;
+    }
+
+    .schedule-grid .course--crowded .course-location,
+    .schedule-grid .course--crowded .course-weeks {
+        font-size: 8.5px;
+        line-height: 1.15;
+    }
+
+    .course--crowded .course-actions {
+        top: 1px;
+        right: 1px;
+        gap: 1px;
+    }
+
+    .course--crowded .course-actions .edit-btn,
+    .course--crowded .course-actions .delete-btn {
+        min-width: 13px;
+        height: 13px;
+        font-size: 8px;
+        border-radius: 4px;
+    }
+
+    /* ⑦ 触屏没有真正的 hover：点完卡片不要一直「浮」在半空 */
+    .schedule-grid .course:hover {
+        transform: none;
+    }
+
+    /* ⑧ 手机上也提示一下「可以左右滑」，别让人以为右边还有内容被切掉了 */
+    .scroll-hint {
+        display: block;
+        margin: 0 0 6px;
+    }
+}
+
+/* 系统开了「减少动态效果」：关掉背景流动与所有过渡，页面依然好看 */
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    body::before,
+    body::after {
+        animation: none;
+    }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+/* 老浏览器不支持 backdrop-filter 时，改用更不透明的白底，保证文字可读 */
+@supports not ((backdrop-filter: blur(4px)) or (-webkit-backdrop-filter: blur(4px))) {
+    .card,
+    .table-wrap,
+    .link-row,
+    .tutorial-btn,
+    .modal,
+    .tutorial-section {
+        background: rgba(255, 255, 255, .94);
+    }
+
+    .modal-backdrop {
+        background: rgba(15, 23, 42, .55);
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="file"],
+    select,
+    textarea {
+        background: rgba(255, 255, 255, .94);
+    }
+}
+
+
+/* =============================================================
+   14. 主题切换：右上角按钮 + 终末地工业风（Endfield）
+   -------------------------------------------------------------
+   · 默认主题 = 上面的橙蓝毛玻璃，不需要任何类名。
+   · 终末地工业风 = <body class="theme-endfield">（<html> 上同步一份），
+     由 static/theme.js 读取 localStorage 后切换并记住选择。
+   · 终末地相关规则全部带 body.theme-endfield 前缀，写在文件最后，
+     保证能压过前面的毛玻璃、流体渐变和大圆角。
+   ============================================================= */
+
+/* --- 14.1 标题区右侧的按钮组（切换主题 + 使用教程） --- */
+.page-header-actions {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 「⚙️ 切换主题」：和「❓ 使用教程」同款玻璃胶囊，用蓝色点亮表示「换外观」 */
+.theme-toggle {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--blue-dark);
+    white-space: nowrap;
+    cursor: pointer;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(30, 58, 138, .08), 0 1px 0 rgba(255, 255, 255, .9) inset;
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    transition: var(--transition);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.theme-toggle:hover {
+    color: #fff;
+    background: var(--gradient-secondary);
+    border-color: rgba(255, 255, 255, .70);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -10px rgba(37, 99, 235, .60);
+}
+
+.theme-toggle:active {
+    transform: translateY(0) scale(.98);
+}
+
+/* 当前是终末地工业风时，按钮后面亮一颗荧光黄小方点（纯装饰） */
+.theme-toggle[aria-pressed="true"]::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    margin-left: 2px;
+    background: #D8FF3E;
+    box-shadow: 0 0 8px rgba(216, 255, 62, .9);
+}
+
+/* 教程开头新增的「个性化主题」小节：默认主题下用暖橙底，和加课步骤区分 */
+.tutorial-section--theme {
+    background: rgba(255, 247, 237, .70);
+    border-color: rgba(255, 174, 90, .55);
+}
+
+.tutorial-section--theme:hover {
+    background: rgba(255, 237, 213, .85);
+}
+
+/* -------------------------------------------------------------
+   14.2 终末地工业风 · 设计变量与整页背景
+   -------------------------------------------------------------
+   · 底色用极深的枪灰 #1A1A1A（不是纯黑），上面叠一层工程网格；
+   · 主线条色 = 荧光黄 #FFE600，只用来「描边 / 角标 / 强调」，
+     面板本身保持半透明深灰，靠线条和刻度撑质感；
+   · 切角统统用 clip-path 的 polygon 画，尺寸收在变量里。
+   ------------------------------------------------------------- */
+body.theme-endfield {
+    /* —— 终末地专用色板 —— */
+    --end-black: #1A1A1A;                    /* 整页底色：枪灰 */
+    --end-black-deep: #141414;
+    --end-panel: rgba(30, 31, 32, .74);      /* 卡片：半透明枪灰 */
+    --end-panel-strong: rgba(23, 24, 25, .95);
+    --end-sunken: rgba(13, 14, 14, .60);     /* 输入框等「下沉槽」 */
+    --end-yellow: #FFE600;                   /* 荧光黄：主线条色 */
+    --end-yellow-bright: #FFF873;
+    --end-yellow-soft: rgba(255, 230, 0, .10);
+    --end-orange: #FF7A1A;                   /* 工业橙：次强调色 */
+    --end-orange-bright: #FFA45C;
+    --end-orange-soft: rgba(255, 122, 26, .12);
+    --end-red: #FF5C5C;
+    --end-text: #E8E8E2;
+    --end-text-soft: #B3B5AD;
+    --end-text-muted: #85877F;
+    --end-line: rgba(255, 230, 0, .30);
+    --end-line-dim: rgba(255, 230, 0, .13);
+    --end-font: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Menlo,
+        Consolas, "Noto Sans SC", "Microsoft YaHei", monospace;
+
+    /* —— 切角形状：右上 + 左下各切一刀（工业铭牌最常见的不对称切法）——
+       尺寸收在 --end-cut* 里，窄屏只要改这几个数字，
+       切角、描边、斜边补线会一起缩小，不用逐条重写。 */
+    --end-cut: 16px;                         /* 卡片 / 弹窗 */
+    --end-cut-mid: 12px;
+    --end-cut-sm: 10px;                      /* 按钮 */
+    --end-cut-xs: 6px;                       /* 小标签 / 小键 */
+    --end-cut-input: 10px;                   /* 输入框（只切右上角） */
+
+    --end-notch: polygon(
+        0 0,
+        calc(100% - var(--end-cut)) 0,
+        100% var(--end-cut),
+        100% 100%,
+        var(--end-cut) 100%,
+        0 calc(100% - var(--end-cut))
+    );
+    --end-notch-mid: polygon(
+        0 0,
+        calc(100% - var(--end-cut-mid)) 0,
+        100% var(--end-cut-mid),
+        100% 100%,
+        var(--end-cut-mid) 100%,
+        0 calc(100% - var(--end-cut-mid))
+    );
+    --end-notch-sm: polygon(
+        0 0,
+        calc(100% - var(--end-cut-sm)) 0,
+        100% var(--end-cut-sm),
+        100% 100%,
+        var(--end-cut-sm) 100%,
+        0 calc(100% - var(--end-cut-sm))
+    );
+    --end-notch-xs: polygon(
+        0 0,
+        calc(100% - var(--end-cut-xs)) 0,
+        100% var(--end-cut-xs),
+        100% 100%,
+        var(--end-cut-xs) 100%,
+        0 calc(100% - var(--end-cut-xs))
+    );
+    /* 输入框只切右上角，那条斜边另用背景层补线，做法见 14.5 */
+    --end-notch-input: polygon(
+        0 0,
+        calc(100% - var(--end-cut-input)) 0,
+        100% var(--end-cut-input),
+        100% 100%,
+        0 100%
+    );
+
+    /* clip-path 会把 border 和描边沿着切角一起切掉，
+       这条 45° 细线就补在切口上：元素背景里放两小块（右上 + 左下），
+       位置和尺寸都跟 --end-cut* 对齐，切口看起来才是「有边」的。 */
+    --end-corner-line: linear-gradient(45deg,
+        transparent calc(50% - .8px),
+        rgba(255, 230, 0, .72) calc(50% - .8px) calc(50% + .8px),
+        transparent calc(50% + .8px));
+
+    /* —— 覆盖默认主题的变量：用 var() 的组件自动跟着换色 —— */
+    --text: var(--end-text);
+    --text-soft: var(--end-text-soft);
+    --text-muted: var(--end-text-muted);
+    --line: var(--end-line-dim);
+    --glass: var(--end-panel);
+    --glass-strong: var(--end-panel-strong);
+    --glass-soft: rgba(255, 255, 255, .04);
+    --glass-border: var(--end-line);
+    --blue: var(--end-yellow);
+    --blue-dark: var(--end-yellow-bright);
+    --blue-deep: var(--end-yellow);
+    --blue-soft: var(--end-yellow-soft);
+    --orange: var(--end-orange);
+    --orange-strong: var(--end-orange-bright);
+    --orange-deep: var(--end-orange-bright);
+    --orange-soft: var(--end-orange-soft);
+    --gradient-primary: linear-gradient(135deg, #FFE600 0%, #D9C400 100%);
+    --gradient-secondary: linear-gradient(135deg, #FFE600 0%, #FFAE1A 100%);
+    --gradient-warm: linear-gradient(135deg, #FF7A1A 0%, #FF5E00 100%);
+    --radius-lg: 0;
+    --radius-md: 0;
+    --radius-sm: 0;
+    /* 切角会把外阴影一起裁掉，所以只用内发光做一层很薄的体积感 */
+    --shadow-card: inset 0 0 42px -24px rgba(255, 230, 0, .30);
+    --shadow-card-hover: inset 0 0 48px -22px rgba(255, 230, 0, .42);
+    --shadow-orange: 0 12px 28px -14px rgba(255, 122, 26, .65);
+}
+
+/* 整页底色与字体（沿用上面那组变量） */
+body.theme-endfield {
+    color: var(--end-text);
+    font-family: var(--end-font);
+    letter-spacing: -.004em;                 /* 字距稍微收紧，排版更硬朗 */
+    background-color: var(--end-black);
+    background-image:
+        /* 顶部一圈极淡的黄光，避免整屏死板 */
+        radial-gradient(1200px 540px at 50% -14%, rgba(255, 230, 0, .07), rgba(255, 230, 0, 0) 70%),
+        /* 工程网格：160px 主线 + 32px 细线 */
+        linear-gradient(rgba(255, 230, 0, .050) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 230, 0, .050) 1px, transparent 1px),
+        linear-gradient(rgba(255, 255, 255, .016) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .016) 1px, transparent 1px);
+    background-size: 100% 100%, 160px 160px, 160px 160px, 32px 32px, 32px 32px;
+    background-repeat: no-repeat, repeat, repeat, repeat, repeat;
+    background-position: 0 0;
+    background-attachment: fixed;
+}
+
+/* <html> 也挂同名类：body 没铺满（触屏回弹等）时露出来的是枪灰而不是浅色 */
+html.theme-endfield {
+    background-color: #1A1A1A;
+    scrollbar-color: rgba(255, 230, 0, .28) transparent;
+}
+
+/* 关掉毛玻璃主题的两团流体柔光，避免和工业网格打架 */
+body.theme-endfield::before,
+body.theme-endfield::after {
+    content: none;
+    display: none;
+    background: none;
+    filter: none;
+    animation: none;
+}
+
+/* 终末地是平面风格：任何元素上的 backdrop-filter 一律去掉（毛玻璃特效全部失效） */
+body.theme-endfield *,
+body.theme-endfield *::before,
+body.theme-endfield *::after {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* --- 14.3 字体、标题、小标题 --- */
+/* 大标题：硬朗斜体 + 下方一条斜切的荧光「载入条」 */
+body.theme-endfield h1 {
+    color: var(--end-yellow);
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: -.018em;
+    text-shadow: 0 0 26px rgba(255, 230, 0, .20);
+}
+
+body.theme-endfield h1::after {
+    content: "";
+    display: block;
+    height: 3px;
+    margin-top: 7px;
+    background-image: linear-gradient(90deg,
+        var(--end-yellow) 0%,
+        rgba(255, 230, 0, .55) 58%,
+        rgba(255, 230, 0, 0) 100%);
+    background-repeat: no-repeat;
+    transform: skewX(-16deg);
+    box-shadow: 0 0 14px -2px rgba(255, 230, 0, .55);
+}
+
+body.theme-endfield .page-eyebrow {
+    color: var(--end-yellow);
+    letter-spacing: .30em;
+}
+
+/* 小标题前的小圆点 → 45° 菱形指示灯 */
+body.theme-endfield .page-eyebrow::before {
+    width: 7px;
+    height: 7px;
+    border-radius: 0;
+    background: var(--end-yellow);
+    box-shadow: 0 0 10px rgba(255, 230, 0, .85);
+    transform: rotate(45deg);
+}
+
+/* 卡片标题：斜体 + 虚线下划，像面板上的标签 */
+body.theme-endfield h2 {
+    color: var(--end-text);
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: .03em;
+    padding-bottom: 7px;
+    border-bottom: 1px dashed rgba(255, 230, 0, .20);
+}
+
+/* 标题左侧竖线 → 斜切的荧光光条 */
+body.theme-endfield h2::before {
+    width: 4px;
+    height: 16px;
+    border-radius: 0;
+    background: linear-gradient(180deg, var(--end-yellow) 0%, rgba(255, 230, 0, .10) 100%);
+    box-shadow: 0 0 12px rgba(255, 230, 0, .55);
+    transform: skewX(-14deg);
+}
+
+body.theme-endfield .hint strong,
+body.theme-endfield .control-hint strong {
+    color: var(--end-yellow);
+}
+
+/* --- 14.4 卡片：半透明枪灰面板 + 1px 荧光切角描边 + 边缘刻度 + // 角标 --- */
+
+/* 不支持 mask 时的兜底：身份栏顶部保留一条橙 → 黄高亮线
+   （必须写在下面的 @supports 之前：支持 mask 时由那条规则接管描边） */
+body.theme-endfield #identity-bar::before {
+    height: 2px;
+    border-radius: 0;
+    background: linear-gradient(90deg,
+        var(--end-orange) 0%,
+        var(--end-yellow) 46%,
+        rgba(255, 230, 0, 0) 100%);
+    box-shadow: 0 0 14px rgba(255, 230, 0, .35);
+}
+
+/* 切角描边：用 mask 把一整块荧光黄「挖空内部」，只留 1px 边，
+   这样右上 / 左下两条切角斜边也能被描上，比 border 更利落。
+   不支持的浏览器只是少一圈描边，布局和功能完全不受影响。 */
+@supports ((-webkit-mask-composite: xor) or (mask-composite: exclude)) {
+    body.theme-endfield .card::before,
+    body.theme-endfield #identity-bar::before,
+    body.theme-endfield .btn::before,
+    body.theme-endfield .copy-btn::before,
+    body.theme-endfield .btn-danger::before,
+    body.theme-endfield .tutorial-btn::before,
+    body.theme-endfield .theme-toggle::before,
+    body.theme-endfield .visit-btn::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: auto;
+        padding: 1px;
+        border-radius: 0;
+        background: linear-gradient(160deg,
+            rgba(255, 230, 0, .92) 0%,
+            rgba(255, 230, 0, .34) 44%,
+            rgba(255, 230, 0, .68) 100%);
+        box-shadow: none;
+        -webkit-mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+        -webkit-mask-clip: content-box, border-box;
+        -webkit-mask-composite: xor;
+        mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+        mask-clip: content-box, border-box;
+        mask-composite: exclude;
+        pointer-events: none;
+    }
+
+    /* 身份栏顶部那条「橙 → 黄」高亮线，不支持 mask 时由 ::before 画（见下），
+       支持时改由卡片背景层来画，::before 让位给描边 */
+    body.theme-endfield #identity-bar {
+        background-image:
+            /* 两处切角的斜边补线（和 .card 一致，这里因为改了图层要重写一遍） */
+            var(--end-corner-line),
+            var(--end-corner-line),
+            linear-gradient(90deg,
+                rgba(255, 122, 26, .95) 0%,
+                rgba(255, 230, 0, .88) 46%,
+                rgba(255, 230, 0, 0) 100%),
+            linear-gradient(180deg, rgba(255, 230, 0, .06) 0%, rgba(255, 230, 0, 0) 40%);
+        background-size:
+            var(--end-cut) var(--end-cut),
+            var(--end-cut) var(--end-cut),
+            100% 2px,
+            100% 100%;
+        background-position: top right, bottom left, 0 0, 0 0;
+        background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+    }
+}
+
+body.theme-endfield .card {
+    background-color: var(--end-panel);
+    background-image:
+        var(--end-corner-line),
+        var(--end-corner-line),
+        linear-gradient(180deg, rgba(255, 230, 0, .055) 0%, rgba(255, 230, 0, 0) 42%),
+        repeating-linear-gradient(135deg,
+            rgba(255, 255, 255, .014) 0 2px,
+            rgba(255, 255, 255, 0) 2px 9px);
+    background-size:
+        var(--end-cut) var(--end-cut),
+        var(--end-cut) var(--end-cut),
+        100% 100%,
+        100% 100%;
+    background-position: top right, bottom left, 0 0, 0 0;
+    background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+    border: 0;
+    border-radius: 0;
+    clip-path: var(--end-notch);
+    box-shadow: var(--shadow-card);
+}
+
+body.theme-endfield .card:hover {
+    border-color: transparent;
+    box-shadow: var(--shadow-card-hover);
+}
+
+/* 一块伪元素干两件事：左上角的「//」角标 + 右上角一小段刻度尺 */
+body.theme-endfield .card::after {
+    content: "//";
+    position: absolute;
+    inset: 0;
+    padding: 7px 0 0 11px;
+    font-family: var(--end-font);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: .24em;
+    color: rgba(255, 230, 0, .62);
+    background-image: repeating-linear-gradient(90deg,
+        rgba(255, 230, 0, .40) 0 1px,
+        rgba(255, 230, 0, 0) 1px 7px);
+    background-size: 56px 4px;
+    background-position: right 22px top 0;
+    background-repeat: no-repeat;
+    pointer-events: none;
+}
+
+/* 紧凑卡片（周次条 / 清空条）本来就很窄，只留刻度、不摆角标 */
+body.theme-endfield .card--compact::after {
+    content: "";
+    background-position: right 16px top 0;
+    background-size: 40px 3px;
+}
+
+body.theme-endfield .identity-main .identity-name {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border: 0;
+    border-radius: 0;
+    clip-path: var(--end-notch-xs);
+    font-style: italic;
+    letter-spacing: .02em;
+    box-shadow: none;
+}
+
+/* 链接行：下沉的深色槽，左侧一条荧光黄短标 */
+body.theme-endfield .link-row {
+    background: var(--end-sunken);
+    border: 1px dashed rgba(255, 230, 0, .18);
+    border-left: 2px solid var(--end-yellow);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+body.theme-endfield .link-row .link-label {
+    color: var(--end-yellow);
+    font-weight: 700;
+    letter-spacing: .08em;
+}
+
+body.theme-endfield .link-row a {
+    color: var(--end-yellow);
+    border-radius: 0;
+}
+
+body.theme-endfield .link-row a:hover {
+    color: var(--end-yellow-bright);
+    background: var(--end-yellow-soft);
+}
+
+/* --- 14.5 表单控件：下沉深槽 + 右上切角 + 荧光斜边 --- */
+body.theme-endfield input[type="text"],
+body.theme-endfield input[type="number"],
+body.theme-endfield input[type="file"],
+body.theme-endfield select,
+body.theme-endfield textarea,
+body.theme-endfield .link-row input {
+    color: var(--end-text);
+    font-family: var(--end-font);
+    letter-spacing: .02em;
+    background-color: var(--end-sunken);
+    /* 第二层铺满整块当底色，第一层只负责右上切角那条 45° 斜边 */
+    background-image:
+        linear-gradient(45deg,
+            transparent calc(50% - .8px),
+            rgba(255, 230, 0, .70) calc(50% - .8px) calc(50% + .8px),
+            transparent calc(50% + .8px)),
+        linear-gradient(180deg, rgba(255, 230, 0, .05) 0%, rgba(255, 230, 0, 0) 100%);
+    background-origin: border-box;
+    background-size: var(--end-cut-input) var(--end-cut-input), 100% 100%;
+    background-position: top right, 0 0;
+    background-repeat: no-repeat, no-repeat;
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    clip-path: var(--end-notch-input);
+    transition: border-color .2s var(--ease), background-color .2s var(--ease),
+        box-shadow .2s var(--ease);
+}
+
+body.theme-endfield input[type="text"]::placeholder,
+body.theme-endfield input[type="number"]::placeholder,
+body.theme-endfield textarea::placeholder {
+    color: var(--end-text-muted);
+}
+
+body.theme-endfield input[type="text"]:focus,
+body.theme-endfield input[type="number"]:focus,
+body.theme-endfield input[type="file"]:focus,
+body.theme-endfield select:focus,
+body.theme-endfield textarea:focus,
+body.theme-endfield .link-row input:focus,
+body.theme-endfield input.cell-input:focus {
+    background-color: rgba(255, 230, 0, .07);
+    border-color: var(--end-yellow);
+    border-radius: 0;
+    outline: none;
+    /* clip-path 会把外阴影裁掉，改成内发光 */
+    box-shadow: inset 0 0 0 1px rgba(255, 230, 0, .35),
+        inset 0 0 22px -10px rgba(255, 230, 0, .65);
+}
+
+/* 下拉框：荧光黄小三角 + 右上切角斜边 + 底色 */
+body.theme-endfield select {
+    padding-right: 32px;
+    background-image:
+        linear-gradient(45deg,
+            transparent calc(50% - .8px),
+            rgba(255, 230, 0, .70) calc(50% - .8px) calc(50% + .8px),
+            transparent calc(50% + .8px)),
+        linear-gradient(45deg, transparent 50%, var(--end-yellow) 50%),
+        linear-gradient(135deg, var(--end-yellow) 50%, transparent 50%),
+        linear-gradient(180deg, rgba(255, 230, 0, .05) 0%, rgba(255, 230, 0, 0) 100%);
+    background-size: var(--end-cut-input) var(--end-cut-input), 5px 5px, 5px 5px, 100% 100%;
+    background-position: top right,
+        calc(100% - 17px) calc(50% - 2px),
+        calc(100% - 12px) calc(50% - 2px),
+        0 0;
+    background-repeat: no-repeat;
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+/* 文件选择框自带的灰按钮 → 荧光黄描边小方钮 */
+body.theme-endfield input[type="file"]::file-selector-button {
+    margin-right: 10px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--end-yellow);
+    cursor: pointer;
+    background: rgba(255, 230, 0, .10);
+    border: 1px solid rgba(255, 230, 0, .40);
+    border-radius: 0;
+    clip-path: var(--end-notch-xs);
+    transition: var(--transition);
+}
+
+body.theme-endfield input[type="file"]::file-selector-button:hover {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border-color: var(--end-yellow);
+}
+
+/* --- 14.6 按钮：切角方钮 + 1px 荧光描边（主操作=荧光黄实心，次操作=描边）--- */
+body.theme-endfield .btn,
+body.theme-endfield .copy-btn,
+body.theme-endfield .tutorial-btn,
+body.theme-endfield .theme-toggle,
+body.theme-endfield .btn-secondary,
+body.theme-endfield .btn-danger {
+    position: relative;             /* 描边伪元素的定位基准 */
+}
+
+body.theme-endfield .btn,
+body.theme-endfield .copy-btn,
+body.theme-endfield .visit-btn,
+body.theme-endfield .tutorial-btn,
+body.theme-endfield .theme-toggle,
+body.theme-endfield .btn-secondary,
+body.theme-endfield .btn-danger {
+    font-family: var(--end-font);
+    font-weight: 700;
+    letter-spacing: .08em;
+    border: 0;
+    border-radius: 0;
+    clip-path: var(--end-notch-sm);
+    box-shadow: none;
+    /* 原毛玻璃按钮藏着一层 220% 宽的「扫光」，终末地统一复位 */
+    background-size: 100% 100%;
+    background-position: 0 0;
+    transition: background-color .2s var(--ease), color .2s var(--ease),
+        box-shadow .2s var(--ease), transform .2s var(--ease);
+}
+
+/* 主操作：唯一亮起的荧光黄实心块，黑字 */
+body.theme-endfield .btn,
+body.theme-endfield .copy-btn {
+    color: #1A1A00;
+    background-color: var(--end-yellow);
+    background-image: linear-gradient(135deg, #FFF873 0%, var(--end-yellow) 54%, #E0CC00 100%);
+    box-shadow: inset 0 0 18px -8px rgba(0, 0, 0, .35);
+}
+
+body.theme-endfield .btn:hover,
+body.theme-endfield .copy-btn:hover {
+    color: #1A1A00;
+    background-position: 0 0;
+    filter: none;
+    box-shadow: inset 0 0 22px -6px rgba(0, 0, 0, .45);
+}
+
+/* 专属免密链接的「复制」：深底 + 荧光描边，和实心主操作一眼区分 */
+body.theme-endfield .copy-btn.magic {
+    color: var(--end-yellow);
+    background-color: rgba(20, 21, 20, .92);
+    background-image: linear-gradient(135deg, rgba(255, 230, 0, .16) 0%, rgba(255, 230, 0, .04) 100%);
+}
+
+body.theme-endfield .copy-btn.magic:hover {
+    color: #1A1A00;
+    background-color: var(--end-yellow);
+    background-image: linear-gradient(135deg, #FFF873 0%, var(--end-yellow) 100%);
+}
+
+/* 次操作：透明深底 + 暗一点的荧光描边 */
+body.theme-endfield .btn-secondary {
+    color: var(--end-yellow);
+    background-color: rgba(255, 230, 0, .04);
+    background-image: linear-gradient(135deg, rgba(255, 230, 0, .12) 0%, rgba(255, 230, 0, .02) 100%);
+}
+
+body.theme-endfield .btn-secondary:hover {
+    color: #1A1A00;
+    background-color: var(--end-yellow);
+    background-image: linear-gradient(135deg, #FFF873 0%, var(--end-yellow) 100%);
+    box-shadow: none;
+}
+
+/* 危险操作：暗红底 + 红字，描边也换成红色（见下面 @supports） */
+body.theme-endfield .btn-danger {
+    color: #FFC9C9;
+    background-color: rgba(58, 14, 14, .88);
+    background-image: linear-gradient(135deg, rgba(255, 92, 92, .28) 0%, rgba(160, 18, 18, .26) 100%);
+}
+
+body.theme-endfield .btn-danger:hover {
+    color: #fff;
+    background-color: #B91C1C;
+    background-image: linear-gradient(135deg, #FF6B6B 0%, #C81E1E 100%);
+    box-shadow: none;
+}
+
+/* 右下角「去串门」：固定式工业橙操作键 */
+body.theme-endfield .visit-btn {
+    color: #1A1A00;
+    background-color: var(--end-orange);
+    background-image: linear-gradient(135deg, #FFB067 0%, var(--end-orange) 55%, #FF5E00 100%);
+    box-shadow: inset 0 0 18px -10px rgba(0, 0, 0, .50);
+}
+
+/* 「❓ 使用教程」「⚙️ 切换主题」：深底描边方钮 */
+body.theme-endfield .tutorial-btn,
+body.theme-endfield .theme-toggle {
+    color: var(--end-yellow);
+    background-color: rgba(22, 23, 23, .84);
+    background-image: linear-gradient(135deg, rgba(255, 230, 0, .10) 0%, rgba(255, 230, 0, .02) 100%);
+    box-shadow: inset 0 0 20px -14px rgba(255, 230, 0, .90);
+}
+
+body.theme-endfield .tutorial-btn:hover,
+body.theme-endfield .theme-toggle:hover {
+    color: #1A1A00;
+    border-color: transparent;
+    background-color: var(--end-yellow);
+    background-image: linear-gradient(135deg, #FFF873 0%, var(--end-yellow) 100%);
+    box-shadow: none;
+}
+
+/* 当前是终末地主题时，按钮后面亮一颗荧光黄小方块 */
+body.theme-endfield .theme-toggle[aria-pressed="true"]::after {
+    border-radius: 0;
+    background: var(--end-yellow);
+    box-shadow: 0 0 10px rgba(255, 230, 0, .95);
+}
+
+body.theme-endfield .theme-toggle[aria-pressed="true"]:hover::after {
+    background: #1A1A00;
+    box-shadow: none;
+}
+
+/* clip-path 会把外描边一起裁掉，键盘焦点改成向内缩的轮廓 */
+@supports ((-webkit-mask-composite: xor) or (mask-composite: exclude)) {
+    body.theme-endfield .btn-danger::before {
+        background: linear-gradient(160deg,
+            rgba(255, 92, 92, .95) 0%,
+            rgba(255, 92, 92, .34) 44%,
+            rgba(255, 92, 92, .70) 100%);
+    }
+}
+
+/* --- 14.7 周次切换条：荧光滑轨 + 竖向滑块（像调频推子） --- */
+body.theme-endfield #week-bar .week-title {
+    color: var(--end-text-muted);
+    letter-spacing: .16em;
+}
+
+body.theme-endfield #week-bar input[type="range"] {
+    background-color: rgba(255, 230, 0, .07);
+    background-image: linear-gradient(90deg,
+        rgba(255, 122, 26, .85) 0%,
+        rgba(255, 230, 0, .55) 52%,
+        var(--end-yellow) 100%);
+    border-radius: 0;
+    box-shadow: inset 0 0 0 1px rgba(255, 230, 0, .16);
+}
+
+body.theme-endfield #week-bar input[type="range"]::-webkit-slider-thumb {
+    width: 12px;
+    height: 22px;
+    background: #141414;
+    border: 2px solid var(--end-yellow);
+    border-radius: 0;
+    box-shadow: 0 0 12px rgba(255, 230, 0, .70);
+}
+
+body.theme-endfield #week-bar input[type="range"]::-moz-range-thumb {
+    width: 10px;
+    height: 20px;
+    background: #141414;
+    border: 2px solid var(--end-yellow);
+    border-radius: 0;
+    box-shadow: 0 0 12px rgba(255, 230, 0, .70);
+}
+
+body.theme-endfield #week-bar input[type="range"]:disabled::-webkit-slider-thumb {
+    border-color: var(--end-text-muted);
+    box-shadow: none;
+}
+
+body.theme-endfield #week-bar input[type="range"]:disabled::-moz-range-thumb {
+    border-color: var(--end-text-muted);
+    box-shadow: none;
+}
+
+body.theme-endfield #week-bar #week-label {
+    color: var(--end-yellow);
+    background: rgba(255, 230, 0, .08);
+    border: 1px solid rgba(255, 230, 0, .40);
+    border-radius: 0;
+    clip-path: var(--end-notch-xs);
+    font-style: italic;
+    letter-spacing: .08em;
+}
+
+body.theme-endfield #week-bar #week-tip {
+    color: var(--end-text-muted);
+}
+
+body.theme-endfield #week-bar .week-toggle {
+    color: var(--end-text-soft);
+    background: rgba(255, 255, 255, .03);
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    clip-path: var(--end-notch-xs);
+}
+
+body.theme-endfield #week-bar .week-toggle:hover {
+    color: var(--end-yellow);
+    background: var(--end-yellow-soft);
+    border-color: rgba(255, 230, 0, .40);
+}
+
+body.theme-endfield #week-bar .week-toggle input[type="checkbox"] {
+    accent-color: var(--end-yellow);
+    /* 原生复选框未勾选时是白底，在深灰页面上很扎眼：让浏览器按深色配色画这个控件 */
+    color-scheme: dark;
+}
+
+/* --- 14.8 课表：深色轨道 + 荧光细线的课程块 --- */
+body.theme-endfield .table-wrap {
+    background: rgba(14, 15, 15, .72);
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    box-shadow: none;
+    scrollbar-color: rgba(255, 230, 0, .28) transparent;
+}
+
+body.theme-endfield .table-wrap::-webkit-scrollbar-thumb {
+    background: rgba(255, 230, 0, .26);
+    border-radius: 0;
+}
+
+body.theme-endfield .table-wrap--plain {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+/* 表头：暗底 + 荧光黄细边 + 斜体字 */
+body.theme-endfield .schedule-table thead th,
+body.theme-endfield .day-head {
+    color: var(--end-yellow);
+    font-style: italic;
+    letter-spacing: .10em;
+    background-color: rgba(255, 230, 0, .07);
+    background-image: linear-gradient(180deg, rgba(255, 230, 0, .10) 0%, rgba(255, 230, 0, 0) 100%);
+    border: 1px solid rgba(255, 230, 0, .26);
+    border-radius: 0;
+    box-shadow: inset 0 -1px 0 rgba(255, 230, 0, .18);
+}
+
+body.theme-endfield .schedule-table tbody th {
+    color: var(--end-text-muted);
+    background: rgba(255, 255, 255, .025);
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    letter-spacing: .04em;
+}
+
+/* 左上角「节次」格：要挡住横向滚过去的星期表头，所以用不透明底 */
+body.theme-endfield .grid-corner {
+    color: var(--end-text-muted);
+    background-color: #1C1C1C;
+    background-image: none;
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    font-style: normal;
+}
+
+/* 左侧时间轴：不透明深底，横向滚动时盖住下面的课程块 */
+body.theme-endfield .period-axis {
+    background: #161616;
+    border: 1px solid var(--end-line-dim);
+    border-left: none;
+    border-radius: 0;
+    box-shadow: 4px 0 12px -8px #000;
+}
+
+body.theme-endfield .period-number {
+    color: var(--end-yellow);
+    font-style: italic;
+    font-weight: 800;
+}
+
+body.theme-endfield .period-time {
+    color: var(--end-text-muted);
+    letter-spacing: .02em;
+}
+
+/* 中午分割行：工业橙虚线带 */
+body.theme-endfield .lunch-axis {
+    color: var(--end-orange);
+    background: #1A1512;
+    border-top: 1px dashed rgba(255, 122, 26, .38);
+    border-bottom: 1px dashed rgba(255, 122, 26, .38);
+    border-radius: 0;
+    letter-spacing: .12em;
+}
+
+body.theme-endfield .lunch-cell {
+    background: linear-gradient(90deg,
+        rgba(255, 122, 26, .12) 0%,
+        rgba(255, 255, 255, .015) 55%,
+        rgba(255, 122, 26, .08) 100%);
+    border-top: 1px dashed rgba(255, 122, 26, .22);
+    border-bottom: 1px dashed rgba(255, 122, 26, .22);
+    border-radius: 0;
+}
+
+/* 课程块：半透明色块 + 荧光细边 + 左侧粗色条（6 组色相区分不同的课） */
+body.theme-endfield .course {
+    --tone: var(--end-yellow);
+    --tone-line: rgba(255, 230, 0, .42);
+    --tone-fill: rgba(255, 230, 0, .10);
+    color: var(--end-text);
+    background-color: rgba(255, 255, 255, .028);
+    background-image: linear-gradient(155deg,
+        var(--tone-fill) 0%,
+        rgba(255, 255, 255, 0) 68%);
+    border: 1px solid var(--tone-line);
+    border-left: 2px solid var(--tone);
+    border-radius: 0;
+    box-shadow: inset 0 0 24px -16px var(--tone);
+}
+
+body.theme-endfield .course:hover {
+    background-color: rgba(255, 255, 255, .05);
+    border-color: var(--tone);
+    box-shadow: inset 0 0 26px -12px var(--tone);
+}
+
+body.theme-endfield .course strong,
+body.theme-endfield .course .course-name {
+    color: var(--tone);
+    font-style: italic;
+    font-weight: 800;
+    letter-spacing: -.01em;
+}
+
+body.theme-endfield .course-period {
+    color: var(--end-text-muted);
+    opacity: 1;
+}
+
+body.theme-endfield .course-weeks,
+body.theme-endfield .course-location {
+    color: var(--end-text-soft);
+    opacity: 1;
+}
+
+/* 6 组荧光色相：只换色，形状不变 */
+body.theme-endfield .course.tone-1 {
+    --tone: #FFE600;
+    --tone-line: rgba(255, 230, 0, .44);
+    --tone-fill: rgba(255, 230, 0, .11);
+}
+
+body.theme-endfield .course.tone-2 {
+    --tone: #FF9A4D;
+    --tone-line: rgba(255, 154, 77, .46);
+    --tone-fill: rgba(255, 122, 26, .12);
+}
+
+body.theme-endfield .course.tone-3 {
+    --tone: #5AD7FF;
+    --tone-line: rgba(90, 215, 255, .42);
+    --tone-fill: rgba(90, 215, 255, .10);
+}
+
+body.theme-endfield .course.tone-4 {
+    --tone: #FF6B6B;
+    --tone-line: rgba(255, 107, 107, .44);
+    --tone-fill: rgba(255, 92, 92, .10);
+}
+
+body.theme-endfield .course.tone-5 {
+    --tone: #C8A0FF;
+    --tone-line: rgba(200, 160, 255, .44);
+    --tone-fill: rgba(200, 160, 255, .10);
+}
+
+body.theme-endfield .course.tone-6 {
+    --tone: #7CFFD4;
+    --tone-line: rgba(124, 255, 212, .42);
+    --tone-fill: rgba(124, 255, 212, .09);
+}
+
+/* --- 14.9 课程卡上的 ✏️ / × 、空白格、身份栏小键、提示条、行内代码 --- */
+body.theme-endfield .delete-btn,
+body.theme-endfield .edit-btn {
+    color: var(--end-text-soft);
+    background: rgba(18, 19, 19, .88);
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+body.theme-endfield .course .delete-btn,
+body.theme-endfield .course .edit-btn {
+    color: var(--end-text-soft);
+    background: rgba(10, 10, 10, .82);
+    border: 1px solid rgba(255, 255, 255, .14);
+}
+
+body.theme-endfield .delete-btn:hover,
+body.theme-endfield .course .delete-btn:hover {
+    color: #fff;
+    background: #B91C1C;
+    border-color: #FF5C5C;
+}
+
+body.theme-endfield .edit-btn:hover,
+body.theme-endfield .course .edit-btn:hover {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border-color: var(--end-yellow);
+}
+
+/* 删除键已进入「再点一次确认」状态：红底白字，必须足够醒目 */
+body.theme-endfield .delete-btn.armed {
+    color: #fff;
+    background: #C81E1E;
+    border-color: #FF8A8A;
+}
+
+/* 空白格：几乎看不见的虚线框，悬浮时才亮起荧光黄 */
+body.theme-endfield .empty-cell {
+    background: rgba(255, 255, 255, .022);
+    border: 1px dashed rgba(255, 230, 0, .14);
+    border-radius: 0;
+}
+
+body.theme-endfield .empty-cell:hover {
+    background: rgba(255, 230, 0, .06);
+    border-color: rgba(255, 230, 0, .40);
+    outline: 1px dashed rgba(255, 230, 0, .45);
+    outline-offset: -4px;
+}
+
+body.theme-endfield .empty-cell::after {
+    color: rgba(255, 230, 0, .58);
+}
+
+/* 身份栏里的「✏️ 修改昵称」小键 */
+body.theme-endfield .name-edit-btn {
+    color: var(--end-yellow);
+    background: rgba(255, 230, 0, .07);
+    border: 1px solid rgba(255, 230, 0, .38);
+    border-radius: 0;
+    clip-path: var(--end-notch-xs);
+    box-shadow: none;
+}
+
+body.theme-endfield .name-edit-btn:hover {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border-color: var(--end-yellow);
+    box-shadow: none;
+}
+
+/* 顶部提示条：错误=红、成功=荧光黄，左侧一道 3px 色条 */
+body.theme-endfield .alert-error {
+    color: #FFD9D9;
+    background: rgba(255, 92, 92, .12);
+    border: 1px solid rgba(255, 92, 92, .40);
+    border-left: 3px solid var(--end-red);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+body.theme-endfield .alert-success {
+    color: var(--end-yellow-bright);
+    background: rgba(255, 230, 0, .10);
+    border: 1px solid rgba(255, 230, 0, .35);
+    border-left: 3px solid var(--end-yellow);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* 行内代码（专属码 / 链接格式）：深底荧光黄字 */
+body.theme-endfield code {
+    color: var(--end-yellow);
+    background: rgba(255, 230, 0, .10);
+    border: 1px solid rgba(255, 230, 0, .22);
+    border-radius: 0;
+}
+
+/* 识图确认区：深色面板 + 工业橙描边 */
+body.theme-endfield #confirm-box {
+    background: var(--end-panel-strong);
+    border: 1px solid rgba(255, 122, 26, .35);
+    border-radius: 0;
+    box-shadow: inset 0 0 0 1px rgba(255, 122, 26, .10);
+}
+
+body.theme-endfield #confirm-box h2::before {
+    background: linear-gradient(180deg, var(--end-orange) 0%, var(--end-yellow) 100%);
+}
+
+body.theme-endfield #confirm-box .hint strong {
+    color: var(--end-orange-bright);
+}
+
+body.theme-endfield .confirm-table thead th {
+    color: var(--end-orange-bright);
+    background: rgba(255, 122, 26, .12);
+    border: 1px solid rgba(255, 122, 26, .28);
+    border-radius: 0;
+    letter-spacing: .06em;
+}
+
+body.theme-endfield .confirm-table tbody td {
+    border-bottom: 1px solid var(--end-line-dim);
+}
+
+body.theme-endfield .confirm-table tbody tr:hover {
+    background: rgba(255, 122, 26, .07);
+}
+
+/* --- 14.10 弹窗 / 使用教程 / 头像 --- */
+body.theme-endfield .modal-backdrop {
+    background: rgba(4, 5, 4, .78);
+}
+
+/* 弹窗也是一块切角深色铭牌：右上 + 左下各切一刀 */
+body.theme-endfield .modal {
+    background-color: var(--end-panel-strong);
+    /* 切角处的斜边补线，做法同 .card */
+    background-image: var(--end-corner-line), var(--end-corner-line);
+    background-size: var(--end-cut) var(--end-cut), var(--end-cut) var(--end-cut);
+    background-position: top right, bottom left;
+    background-repeat: no-repeat, no-repeat;
+    border: 1px solid rgba(255, 230, 0, .30);
+    border-radius: 0;
+    clip-path: var(--end-notch);
+    box-shadow: 0 40px 90px -30px #000;
+}
+
+body.theme-endfield .modal h2,
+body.theme-endfield .modal--tutorial h2 {
+    color: var(--end-yellow);
+}
+
+body.theme-endfield .modal--danger h2 {
+    color: var(--end-red);
+}
+
+body.theme-endfield .modal-subtitle,
+body.theme-endfield .modal-hint,
+body.theme-endfield .modal .field-label {
+    color: var(--end-text-soft);
+}
+
+body.theme-endfield .modal-close {
+    color: var(--end-text-soft);
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+}
+
+body.theme-endfield .modal-close:hover {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border-color: var(--end-yellow);
+}
+
+/* 教程底部吸底的按钮条：底色要跟着弹窗一起变深 */
+body.theme-endfield .modal--tutorial .modal-actions {
+    background: linear-gradient(180deg, rgba(23, 24, 25, 0) 0%, rgba(23, 24, 25, .97) 45%);
+}
+
+/* 教程小节：深色小面板 + 左侧色条区分用途 */
+body.theme-endfield .tutorial-section,
+body.theme-endfield .tutorial-section--theme,
+body.theme-endfield .tutorial-section--install {
+    background: rgba(255, 255, 255, .035);
+    border: 1px solid var(--end-line-dim);
+    border-radius: 0;
+    box-shadow: none;
+}
+
+body.theme-endfield .tutorial-section:hover,
+body.theme-endfield .tutorial-section--theme:hover,
+body.theme-endfield .tutorial-section--install:hover {
+    background: rgba(255, 230, 0, .06);
+    border-color: rgba(255, 230, 0, .34);
+}
+
+/* 讲主题的那一节用工业橙，讲「添加到主屏幕」的两节用荧光黄 */
+body.theme-endfield .tutorial-section--theme {
+    border-left: 3px solid var(--end-orange);
+}
+
+body.theme-endfield .tutorial-section--install {
+    border-left: 3px solid var(--end-yellow);
+}
+
+body.theme-endfield .tutorial-section h3 {
+    color: var(--end-text);
+}
+
+body.theme-endfield .tutorial-index {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border-radius: 0;
+    box-shadow: none;
+    font-weight: 800;
+}
+
+body.theme-endfield .tutorial-section p,
+body.theme-endfield .tutorial-steps,
+body.theme-endfield .tutorial-dl dd {
+    color: var(--end-text-soft);
+}
+
+body.theme-endfield .tutorial-steps strong,
+body.theme-endfield .tutorial-dl dt {
+    color: var(--end-yellow-bright);
+}
+
+body.theme-endfield .tutorial-section .tutorial-example {
+    color: var(--end-text);
+    background: rgba(0, 0, 0, .42);
+    border: 1px dashed rgba(255, 230, 0, .30);
+    border-radius: 0;
+}
+
+body.theme-endfield .tutorial-section .tutorial-key {
+    color: var(--end-orange-bright);
+    background: rgba(255, 122, 26, .10);
+    border: 1px solid rgba(255, 122, 26, .35);
+    border-radius: 0;
+}
+
+body.theme-endfield .tutorial-section .tutorial-note {
+    color: var(--end-text-muted);
+}
+
+/* 头像：方形铭牌边框 + 荧光黄首字母 */
+body.theme-endfield .avatar-frame,
+body.theme-endfield .avatar-frame--empty {
+    color: var(--end-yellow);
+    background: rgba(255, 255, 255, .04);
+    border: 2px solid rgba(255, 230, 0, .40);
+    border-radius: 0;
+    clip-path: var(--end-notch-xs);
+    box-shadow: inset 0 0 16px -8px rgba(255, 230, 0, .80);
+}
+
+body.theme-endfield .avatar-frame img {
+    border-radius: 0;
+}
+
+body.theme-endfield .avatar-picker:hover .avatar-frame,
+body.theme-endfield .avatar-picker:focus-within .avatar-frame {
+    border-color: var(--end-yellow);
+    box-shadow: inset 0 0 20px -6px rgba(255, 230, 0, .90);
+}
+
+body.theme-endfield .avatar-badge {
+    color: #1A1A00;
+    background: var(--end-yellow);
+    border: 1px solid var(--end-yellow);
+    border-radius: 0;
+}
+
+body.theme-endfield .avatar-tip {
+    color: var(--end-yellow-bright);
+}
+
+body.theme-endfield .avatar-tip--error {
+    color: var(--end-red);
+}
+
+/* --- 14.11 文字 / 链接 / 滚动条 / 键盘焦点等细节 --- */
+body.theme-endfield .page-subtitle,
+body.theme-endfield .readonly-tip,
+body.theme-endfield .scroll-hint,
+body.theme-endfield .viewer-tip,
+body.theme-endfield .identity-main .identity-hint,
+body.theme-endfield .control-hint,
+body.theme-endfield .hint {
+    color: var(--end-text-muted);
+}
+
+body.theme-endfield .viewer-tip strong {
+    color: var(--end-yellow);
+}
+
+body.theme-endfield .viewer-tip a {
+    color: var(--end-yellow);
+    border-radius: 0;
+}
+
+body.theme-endfield .viewer-tip a:hover {
+    color: var(--end-yellow-bright);
+    background: var(--end-yellow-soft);
+}
+
+body.theme-endfield .control-title {
+    color: var(--end-text);
+}
+
+body.theme-endfield .field-label {
+    color: var(--end-text-soft);
+}
+
+/* 输入框下方/卡片里的小提示 */
+body.theme-endfield .upload-status {
+    color: var(--end-yellow);
+}
+
+body.theme-endfield .upload-status--error {
+    color: var(--end-red);
+}
+
+body.theme-endfield #link-tip {
+    color: var(--end-yellow);
+}
+
+body.theme-endfield .text-link {
+    color: var(--end-yellow);
+    border-radius: 0;
+}
+
+body.theme-endfield .text-link:hover {
+    color: var(--end-yellow-bright);
+}
+
+/* 全站链接：默认荧光黄，悬浮更亮 */
+body.theme-endfield a {
+    color: var(--end-yellow);
+}
+
+body.theme-endfield a:hover {
+    color: var(--end-yellow-bright);
+}
+
+body.theme-endfield ::selection {
+    color: #1A1A00;
+    background: var(--end-yellow);
+}
+
+body.theme-endfield ::-webkit-scrollbar-thumb {
+    background: rgba(255, 230, 0, .28);
+    border-radius: 0;
+    background-clip: content-box;
+}
+
+body.theme-endfield ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 230, 0, .45);
+    background-clip: content-box;
+}
+
+/* 键盘 Tab 时的焦点框：统一换成荧光黄，深色底上依然清楚 */
+body.theme-endfield a:focus-visible,
+body.theme-endfield button:focus-visible,
+body.theme-endfield .week-toggle:focus-within,
+body.theme-endfield .avatar-picker:focus-within {
+    outline: 2px solid rgba(255, 230, 0, .70);
+    outline-offset: 3px;
+}
+
+/* 被 clip-path 裁过外形的控件：焦点框改成向内缩，否则会被一起裁掉 */
+body.theme-endfield .btn:focus-visible,
+body.theme-endfield .copy-btn:focus-visible,
+body.theme-endfield .btn-secondary:focus-visible,
+body.theme-endfield .btn-danger:focus-visible,
+body.theme-endfield .tutorial-btn:focus-visible,
+body.theme-endfield .theme-toggle:focus-visible,
+body.theme-endfield .visit-btn:focus-visible,
+body.theme-endfield .name-edit-btn:focus-visible,
+body.theme-endfield .modal-close:focus-visible {
+    outline: 2px solid rgba(255, 230, 0, .85);
+    outline-offset: -3px;
+}
+
+/* --- 14.12 移动端微调：切角收小一档，省一点视觉噪音 --- */
+@media (max-width: 720px) {
+    /* 切角、描边、斜边补线全都挂在 --end-cut* 上，这里改小一档即可 */
+    body.theme-endfield {
+        --end-cut: 12px;
+        --end-cut-mid: 9px;
+        --end-cut-sm: 8px;
+        --end-cut-xs: 5px;
+        --end-cut-input: 8px;
+    }
+
+    /* 窄屏上卡片右侧那截刻度尺会贴着内容，收掉更干净（左上角 // 保留） */
+    body.theme-endfield .card::after {
+        background-image: none;
+    }
+}
+
+/* =============================================================
+   15. 移动端性能：≤ 768px 关掉毛玻璃与流体动画
+   -------------------------------------------------------------
+   · backdrop-filter 要实时模糊背后的内容，手机上几乎全靠 GPU 合成，
+     一滚动就掉帧；两块大面积毛玻璃（卡片 + 课表）尤其明显。
+   · 背后两团柔光还在 30s / 22s 无限循环播放，一直在提交新的合成帧。
+   · 窄屏的取舍：背景模糊 → 直接关掉，把玻璃底换成同色但不透明的底；
+     流体动画 → 停帧、去掉那层 28px/56px 的高斯模糊（渐变本身够柔）；
+     圆角、阴影、渐变按钮、悬浮位移全部保留，观感基本不变。
+   ============================================================= */
+@media (max-width: 768px) {
+    /* ① 任何元素都不再吃背景模糊（含伪元素，兼容老 WebKit 前缀） */
+    body,
+    body *,
+    body *::before,
+    body *::after {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+
+    /* ② 少了模糊后，半透明玻璃底会「透」得看不清字，换成同色系的实底 */
+    .card {
+        background-color: rgba(255, 255, 255, .93);
+    }
+
+    .tutorial-btn,
+    .theme-toggle {
+        background-color: rgba(255, 255, 255, .93);
+    }
+
+    #week-bar .week-toggle {
+        background-color: rgba(255, 255, 255, .90);
+    }
+
+    .link-row {
+        background-color: rgba(255, 255, 255, .90);
+    }
+
+    .link-row input,
+    input[type="text"],
+    input[type="number"],
+    input[type="file"],
+    select,
+    textarea {
+        background-color: rgba(255, 255, 255, .94);
+    }
+
+    .table-wrap {
+        background-color: rgba(255, 255, 255, .94);
+    }
+
+    .schedule-table thead th,
+    .day-head,
+    .period-axis {
+        background-color: rgba(255, 255, 255, .97);
+    }
+
+    .modal-backdrop {
+        background-color: rgba(15, 23, 42, .55);
+    }
+
+    .modal {
+        background-color: rgba(255, 255, 255, .96);
+    }
+
+    /* 教程底部吸底按钮条：原来靠模糊盖住下面的文字，这里改成实底渐变 */
+    .modal--tutorial .modal-actions {
+        background-image: linear-gradient(180deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, .97) 45%);
+    }
+
+    .alert-error {
+        background-color: rgba(254, 242, 242, .96);
+    }
+
+    .alert-success {
+        background-color: rgba(236, 253, 245, .96);
+    }
+
+    /* ③ 流体柔光停帧：不再每秒重算 transform，也去掉那层大半径模糊 */
+    body::before,
+    body::after {
+        animation: none !important;
+        filter: none;
+        will-change: auto;
+    }
+
+    /* ④ 背景不用 fixed：iOS / Android 滚动时 fixed 背景要反复重绘，
+          换成随内容滚动的 scroll 便宜得多（终末地的工程网格同理） */
+    body,
+    body.theme-endfield {
+        background-attachment: scroll;
+    }
+}
+
+/* 标题区右侧的按钮组：手机上两个按钮各占一半，手指更好点 */
+@media (max-width: 720px) {
+    .page-header-actions {
+        width: 100%;
+    }
+
+    .page-header-actions .tutorial-btn,
+    .page-header-actions .theme-toggle {
+        flex: 1 1 0;
+        padding: 8px 12px;
+        font-size: 12.5px;
+    }
+}

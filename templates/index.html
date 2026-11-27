@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# 手机浏览器地址栏 / 状态栏颜色：static/theme.js 会在切到终末地风时把它改成 #121212 #}
+    <meta name="theme-color" content="#F7FAFF" id="theme-color-meta">
+    <title>我的课表</title>
+
+    <!-- 现代无衬线字体：Inter（拉丁）+ Noto Sans SC（中文），加载失败时回退到系统字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+          rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='ui.js') }}" defer></script>
+</head>
+<body>
+
+{# 主题脚本放在 body 最前面：先按上次的选择贴好 .theme-endfield，再渲染内容，
+   这样刷新页面不会先闪一下默认的毛玻璃主题（逻辑见 static/theme.js）。 #}
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+
+{% from "_schedule_grid.html" import schedule_grid %}
+
+<div class="page">
+
+    <header class="page-header">
+        <div class="page-header-text">
+            <p class="page-eyebrow">Class Schedule</p>
+            <h1>{{ current_user['username'] }}的课表</h1>
+            <p class="page-subtitle">点一下空白格子就能加课，也支持截图识别和整段文字批量录入。</p>
+        </div>
+
+        <div class="page-header-actions">
+            {# ⚙️ 主题切换：默认「清爽毛玻璃」，点一下切到「终末地工业风」；
+               选择写进 localStorage，刷新 / 下次打开都保持上次的主题（见 static/theme.js） #}
+            <button type="button" class="theme-toggle" id="theme-toggle"
+                    onclick="toggleTheme()" aria-pressed="false"
+                    title="当前：清爽毛玻璃 · 点击切换到终末地工业风">
+                <span class="theme-toggle-label">⚙️ 切换主题</span>
+            </button>
+
+            {# ❓ 使用教程：点开弹出模态框（个性化主题 / 三种加课方式 / 周次切换 / 串门 / 添加到手机主屏幕） #}
+            <button type="button" class="tutorial-btn" onclick="openTutorialModal()"
+                    title="个性化主题、三种加课方式、周次切换、串门看课表、添加到手机主屏幕 / 电脑桌面">
+                ❓ 使用教程
+            </button>
+        </div>
+    </header>
+
+    {# 后端处理完会带着 ?error=xxx / ?message=xxx 跳回来，这里显示提示 #}
+    {% if error %}
+        <p class="alert alert-error">{{ error }}</p>
+    {% endif %}
+    {% if message %}
+        <p class="alert alert-success">{{ message }}</p>
+    {% endif %}
+
+    {# ===== 身份栏：没有下拉框了，身份由「你打开的链接」决定 =====
+         用 /?u=<share_code> 打开首页 → 后端把 session 绑成这个人 → 之后只能改他自己的课表。
+         所有写操作（上传截图 / 一句话添加 / 手动添加 / 修改课程 / 删除课程 / 一键清空 / 改昵称）
+         都只认 session 里的身份，
+         URL 或表单里塞 u / user_id 不会生效，所以改参数改不了别人的课表。 #}
+    <section id="identity-bar" class="card">
+        <div class="identity-main">
+            {# 小头像：点一下就能换。真正选图的是下面那个隐藏的 file 输入框，
+               选完由 JS 提交到 /upload-avatar，成功后直接把新地址塞进 <img>（不刷新页面）。
+               没上传过头像时显示昵称首字母，避免出现「空白圆圈」。 #}
+            <label class="avatar-picker" for="avatar-input" title="点击更换头像（2MB 以内的图片）">
+                <span class="avatar-frame{% if not avatar_url %} avatar-frame--empty{% endif %}" id="avatar-wrap">
+                    {% if avatar_url %}
+                        <img id="avatar-img" src="{{ avatar_url }}" alt="{{ current_user['username'] }}的头像">
+                    {% else %}
+                        <span class="avatar-initial" id="avatar-initial">{{ current_user['username'][:1] or '?' }}</span>
+                    {% endif %}
+                </span>
+                <span class="avatar-badge" aria-hidden="true">📷</span>
+                <span class="visually-hidden">更换头像</span>
+            </label>
+
+            <span>当前身份：</span>
+            <strong class="identity-name">{{ current_user['username'] }}</strong>
+            {# 修改昵称：点了弹出模态框，提交到 /update-name，改的是 session 里这个人 #}
+            <button type="button" class="name-edit-btn" onclick="openNameModal()"
+                    title="修改昵称（只改你自己的显示名）">
+                ✏️ 修改昵称
+            </button>
+            <span class="identity-hint">
+                （免密码 {{ share_code }} · 通过专属链接进入后，你只能上传、修改自己的课表）
+            </span>
+        </div>
+
+        {# 换头像用的隐藏表单：label 点一下等于点这个 input，
+           选完图片立刻触发 onchange → uploadAvatar() 用 fetch 提交，不用刷新页面。
+           字段名只叫 avatar，不带任何身份参数（身份由 session 决定）。 #}
+        <form id="avatar-form" class="avatar-form" action="{{ url_for('upload_avatar') }}"
+              method="post" enctype="multipart/form-data">
+            <input type="file" id="avatar-input" name="avatar" accept="image/*"
+                   onchange="uploadAvatar(this.form)">
+        </form>
+
+        {# 头像上传的提示（成功 / 太大 / 格式不对都显示在这，成功几秒后自动清空） #}
+        <p id="avatar-tip" class="avatar-tip"></p>
+
+        {# 专属免密链接：打开直接就是「当前身份」，等于密码，别随手发人 #}
+        <div class="link-row">
+            <span class="link-label">专属免密链接</span>
+            <input id="magic-link" type="text" value="{{ magic_url }}" readonly
+                   onclick="this.select();" title="点击可选中整条链接">
+            <button type="button" class="copy-btn magic"
+                    onclick="copyLink('magic-link', '已复制专属免密链接：打开就是你的身份，请别发给只想看看的同学')">
+                复制专属链接
+            </button>
+            <a href="{{ magic_url }}">打开</a>
+        </div>
+
+        {# 只读链接：/view/<code>，同学打开只能看，页面里没有任何表单 #}
+        <div class="link-row">
+            <span class="link-label">只读分享链接</span>
+            <input id="readonly-link" type="text" value="{{ readonly_url }}" readonly
+                   onclick="this.select();" title="点击可选中整条链接">
+            <button type="button" class="copy-btn"
+                    onclick="copyLink('readonly-link', '已复制只读链接：同学打开只能看课表，不能改')">
+                复制只读链接
+            </button>
+            <a href="{{ readonly_url }}" target="_blank" rel="noopener">预览</a>
+        </div>
+
+        <p id="link-tip"></p>
+    </section>
+
+    {# 串门：跳到对方的只读课表页面（那边依然没有任何修改表单）。
+       必须放在玻璃卡片外面：卡片的 backdrop-filter 会成为 position: fixed 的包含块，
+       放里面的话悬浮按钮就不再固定在视口右下角了。 #}
+    {% if partner %}
+        <a class="visit-btn" href="{{ partner_view_url }}">
+            🚪 去看「{{ partner['username'] }}」的课表（只读）
+        </a>
+    {% endif %}
+
+    {# ===== 顶部控制区：一键清空自己的课表 =====
+         红色按钮只是「打开确认弹窗」，真正提交的是下面这个 POST 表单：
+         提交到 /clear → 后端只删 session 里这个人的课 → 重定向回首页并提示删了几门。
+         后端只认 session 身份，请求里也不需要（不允许）带任何身份参数。 #}
+    <section id="control-bar" class="card card--compact">
+        <div class="control-bar-main">
+            <div class="control-bar-text">
+                <strong class="control-title">课表管理</strong>
+                <p class="control-hint">
+                    一键清空只会删除<strong>你自己</strong>课表里的课程，不会影响同学的课表；清空后无法恢复。
+                </p>
+            </div>
+
+            {# onsubmit 里带一个兜底：万一下面的脚本没加载成功、askClearConfirm 不存在，
+               也一定先用浏览器原生 confirm 问一次，绝不会「不确认就直接清空」。 #}
+            <form id="clear-form" class="control-form"
+                  action="{{ url_for('clear_schedule') }}" method="post"
+                  onsubmit="return window.askClearConfirm ? askClearConfirm() : window.confirm('确定要清空所有课程吗？清空后无法恢复。');">
+                <button type="submit" class="btn btn-danger">🗑️ 清空我的课表</button>
+            </form>
+        </div>
+    </section>
+
+    {# ===== 识图结果的二次确认 =====
+         后端识别完不直接入库，把课程列表（pending_courses）传过来，
+         用户在这里核对/修改，点「确认保存」才提交到 /confirm-image #}
+    {% if pending_courses %}
+        <section id="confirm-box" class="card">
+            <h2>识别结果确认</h2>
+            <p class="hint">
+                下面是从图片里识别出的课程，<strong>还没有存入数据库</strong>。
+                可以直接修改，确认无误后点「确认保存」。
+                {% if skipped %}（另有 {{ skipped }} 条格式不对，已自动跳过）{% endif %}
+            </p>
+
+            <form action="{{ url_for('confirm_image') }}" method="post">
+                <div class="table-wrap table-wrap--plain">
+                    <table class="confirm-table">
+                    <thead>
+                        <tr>
+                            <th>课程名</th>
+                            <th>星期</th>
+                            <th>开始节次</th>
+                            <th>结束节次</th>
+                            <th>周数</th>
+                            <th>地点</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for course in pending_courses %}
+                            <tr>
+                                <td><input type="text" name="name" value="{{ course['name'] }}" required></td>
+                                <td>
+                                    {# loop.index 从 1 开始，正好是 weekday 的值 #}
+                                    <select name="weekday">
+                                        {% for weekday in weekdays %}
+                                            <option value="{{ loop.index }}"
+                                                {% if loop.index == course['weekday'] %}selected{% endif %}>
+                                                {{ weekday }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="period">
+                                        {% for row in period_rows %}
+                                            <option value="{{ row.number }}"
+                                                {% if row.number == course['period'] %}selected{% endif %}>
+                                                第 {{ row.number }} 节
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="end_period">
+                                        {% for row in period_rows %}
+                                            <option value="{{ row.number }}"
+                                                {% if row.number == course['end_period'] %}selected{% endif %}>
+                                                第 {{ row.number }} 节
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    {# 周数：后端已经规范化成 1-16 / 1-16单 / 2-16双 / 1-8,10-16 这类写法 #}
+                                    <input type="text" name="weeks" value="{{ course['weeks'] }}"
+                                           placeholder="1-16 / 单周 / 双周" size="12">
+                                </td>
+                                <td><input type="text" name="location" value="{{ course['location'] }}"></td>
+                                <td>
+                                    {# 识别错的行可以直接删掉，不用一个个清空输入框 #}
+                                    <button type="button" class="delete-btn" title="不要这一条"
+                                            onclick="this.closest('tr').remove()">×</button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    </table>
+                </div>
+
+                <div class="confirm-actions">
+                    <button type="submit" class="btn">确认保存</button>
+                    <a class="text-link" href="{{ url_for('index') }}">取消</a>
+                </div>
+            </form>
+        </section>
+    {% endif %}
+
+    <!-- ===== 顶部工具区：上传截图 / 一句话添加（桌面并排，手机竖排） ===== -->
+    <div class="tools-grid">
+
+        <!-- 上传课表截图，一键解析（调用智谱 GLM 视觉模型）
+             enctype="multipart/form-data" 是必须的，否则后端 request.files 拿不到文件 -->
+        <section class="card">
+            <h2>上传课表截图一键解析</h2>
+
+            <form class="upload-form" action="{{ url_for('add_image') }}" method="post"
+                  enctype="multipart/form-data" onsubmit="return handleImageSubmit(this);">
+                <label class="field">
+                    <span class="field-label">选择课表截图</span>
+                    <input type="file" name="image" accept="image/*" required
+                           onchange="showPickedImage(this)">
+                </label>
+                <button type="submit" class="btn">上传并识别</button>
+            </form>
+
+            {# 压缩 / 上传的实时提示：选中图片后显示「原图 → 压缩后」的大小，出错也写在这里 #}
+            <p id="image-status" class="upload-status"></p>
+
+            <p class="hint">
+                支持 JPG / PNG 等图片，建议不超过 5MB。上传前网页会自动把图片压缩成
+                <strong>宽度 1200px 的 JPEG</strong> 再发给视觉模型，识别更准、上传也更快。<br>
+                识别大约要 10~20 秒，点完请耐心等待，不要重复点击。<br>
+                识别结果不会直接入库，页面会显示「识别结果确认」，核对（可修改）后点「确认保存」才写入课表。
+            </p>
+        </section>
+
+        <!-- 用一段话批量添加课程（调用 DeepSeek 解析，一次可以粘贴多门） -->
+        <section class="card">
+            <h2>批量粘贴添加课程</h2>
+
+            <form class="stack-form" action="{{ url_for('add_by_text') }}" method="post">
+                <textarea name="text" rows="5" required
+                          placeholder="可以一次粘贴多门课，例如：&#10;周一上午1-2节高数&#10;周三下午5-6节英语"></textarea>
+                <button type="submit" class="btn">AI 解析并批量添加</button>
+            </form>
+
+            <p class="hint">
+                每行写一门课，可以一次粘贴多门，识别后会一起写进课表。<br>
+                节次编号约定：上午 1~4 节、下午 5~8 节、晚上 9~11 节，所以「下午第二节课」会记成第 6 节。
+                连堂课写成「1-2节」「5-6节」，会自动合并成一张跨两节的卡片。
+                想改这个规则，就改 app.py 里的 AI_SYSTEM_PROMPT。
+            </p>
+        </section>
+
+    </div>
+
+    <!-- ===== 手动精确填写（AI 解析不准时的兜底） ===== -->
+    <section class="card">
+        <h2>手动添加</h2>
+
+        <form class="manual-form" action="{{ url_for('add_course') }}" method="post">
+            <div class="form-grid">
+                <label class="field">
+                    <span class="field-label">课程名</span>
+                    <input type="text" name="name" placeholder="例如：高等数学" required>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">星期</span>
+                    <select name="weekday">
+                        {# loop.index 从 1 开始，刚好当作数据库里的 weekday 值 #}
+                        {% for weekday in weekdays %}
+                            <option value="{{ loop.index }}">{{ weekday }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">开始节次</span>
+                    <select name="period" id="add-period"
+                            onchange="syncEndPeriod(this, 'add-end-period')">
+                        {% for row in period_rows %}
+                            <option value="{{ row.number }}">第 {{ row.number }} 节（{{ row.start }}）</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">结束节次</span>
+                    <select name="end_period" id="add-end-period"
+                            title="单节课选和开始节次相同；连堂课选后面的节次">
+                        {% for row in period_rows %}
+                            <option value="{{ row.number }}">第 {{ row.number }} 节（{{ row.end }}）</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">周数</span>
+                    <input type="text" name="weeks" value="{{ default_weeks }}"
+                           placeholder="例如：1-16、1-8、单周、双周"
+                           title="支持 1-16 / 1-8 / 单周 / 双周 / 1-8,10-16；留空按 1-16 周处理">
+                </label>
+
+                <label class="field">
+                    <span class="field-label">地点</span>
+                    <input type="text" name="location" placeholder="例如：教学楼 A101">
+                </label>
+            </div>
+
+            <button type="submit" class="btn">添加课程</button>
+        </form>
+    </section>
+
+    {# ===== 周数切换：纯前端过滤，切周不会重新请求后端 =====
+         滑块范围 1 ~ max_week（后端 MAX_WEEK = 20）。
+         默认值 default_week 是后端按真实日期算出的「今天是第几周」（见 app.py 的
+         get_current_week()），所以打开页面直接停在本周，而不是每次都从第 1 周开始。
+         页面底部脚本的 applyWeekFilter() 会把不属于这一周的课程隐藏掉；
+         勾选「显示所有周次」后脚本会取消过滤，所有课程都显示。 #}
+    <section id="week-bar" class="card card--compact">
+        <strong class="week-title">当前周次</strong>
+        <input type="range" id="week-slider" min="1" max="{{ max_week }}" value="{{ default_week }}" step="1"
+               title="拖动切换周数">
+        <span id="week-label">第 {{ default_week }} 周</span>
+
+        {# 勾上就不按周过滤：不管课程属于哪几周，全部显示出来 #}
+        <label class="week-toggle" for="week-show-all">
+            <input type="checkbox" id="week-show-all">
+            <span>显示所有周次（不按周过滤）</span>
+        </label>
+
+        <span id="week-tip"></span>
+    </section>
+
+    <!-- ===== 课表（教务系统风格：固定时间轴 + 跨节次课程卡片）=====
+         第 1 列是节次和上下课时间（横向滚动时用 position: sticky 固定在左边），
+         后面 7 列是星期一到星期日；第 4 节后有一条「中午」分割行。
+         连堂课（例如 1-2 节）会合并成一张跨两行的卡片，见 templates/_schedule_grid.html -->
+    <p class="scroll-hint">← 左右滑动查看完整课表 →</p>
+    {{ schedule_grid(
+        courses,
+        weekdays,
+        period_rows,
+        lunch_row,
+        num_periods,
+        lunch_after_period,
+        editable=True
+    ) }}
+
+</div><!-- /.page -->
+
+    {# ================= 三个模态框（纯原生 JS 控制显隐，不依赖任何前端框架） =================
+         1) #edit-modal  修改课程：点卡片上的 ✏️ 打开，自动填入现有值，提交到 /edit/<id>
+         2) #name-modal  修改昵称：点身份栏的「修改昵称」打开，提交到 /update-name
+         3) #clear-modal 一键清空的二次确认，确认后提交 #clear-form 到 /clear
+         三个表单里都没有 user_id / share_code / u 之类的身份字段：
+         后端只认 session 里的身份，所以改不到别人的课表。 #}
+
+    {# ===== 1. 修改课程 ===== #}
+    <div class="modal-backdrop" id="edit-modal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+            <h2 id="edit-modal-title">修改课程</h2>
+            <p class="modal-subtitle" id="edit-modal-subtitle"></p>
+
+            {# action 由 openEditModal() 填成 /edit/<id>，这里先留空 #}
+            <form id="edit-form" method="post" action="">
+                {# 星期和节次不允许在弹窗里改，用隐藏字段原样带回去（后端还会再校验范围） #}
+                <input type="hidden" name="weekday" id="edit-weekday">
+                <input type="hidden" name="period" id="edit-period">
+
+                <label class="field">
+                    <span class="field-label">课程名</span>
+                    <input type="text" name="name" id="edit-name" required maxlength="100"
+                           autocomplete="off" placeholder="例如：高等数学">
+                </label>
+
+                <label class="field">
+                    <span class="field-label">结束节次</span>
+                    <select name="end_period" id="edit-end-period"
+                            onchange="syncEndPeriod(document.getElementById('edit-period'), 'edit-end-period')"
+                            title="单节课选和开始节次相同；连堂课选后面的节次">
+                        {% for row in period_rows %}
+                            <option value="{{ row.number }}">第 {{ row.number }} 节（{{ row.end }} 结束）</option>
+                        {% endfor %}
+                    </select>
+                </label>
+
+                <label class="field">
+                    <span class="field-label">地点</span>
+                    <input type="text" name="location" id="edit-location" maxlength="200"
+                           autocomplete="off" placeholder="例如：教学楼 A101（可以留空）">
+                </label>
+
+                <label class="field">
+                    <span class="field-label">周数</span>
+                    <input type="text" name="weeks" id="edit-weeks" maxlength="60"
+                           autocomplete="off" placeholder="例如：1-16、1-8、单周、双周">
+                </label>
+
+                <p class="modal-hint">
+                    周数支持 1-16 / 1-8 / 单周 / 双周 / 1-8,10-16；留空按 1-16 周处理。<br>
+                    开始节次和星期保持不变；连堂课可以在「结束节次」里改成后面的节次（例如开始第 1 节、结束第 2 节）。
+                </p>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                    <button type="submit" class="btn">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ===== 2. 修改昵称 ===== #}
+    <div class="modal-backdrop" id="name-modal" hidden>
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="name-modal-title">
+            <h2 id="name-modal-title">修改昵称</h2>
+            <p class="modal-subtitle">只改你自己的显示名：页面大标题、身份栏会一起变；课表和分享链接都不受影响。</p>
+
+            <form method="post" action="{{ url_for('update_name') }}">
+                <label class="field">
+                    <span class="field-label">昵称</span>
+                    {# ★ 字段名必须叫 nickname：后端会把 POST 里的 username 当作越权参数直接 400 #}
+                    <input type="text" name="nickname" id="name-input" required maxlength="20"
+                           autocomplete="off" value="{{ current_user['username'] }}">
+                </label>
+
+                <p class="modal-hint">最多 20 个字符，不能和别人的昵称重复。</p>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeNameModal()">取消</button>
+                    <button type="submit" class="btn">保存昵称</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# ===== 3. 一键清空的二次确认 =====
+         只是「确认框」，本身不提交任何数据；点「确定清空」才会提交上面的 #clear-form #}
+    <div class="modal-backdrop" id="clear-modal" hidden>
+        <div class="modal modal--danger" role="alertdialog" aria-modal="true"
+             aria-labelledby="clear-modal-title">
+            <h2 id="clear-modal-title">确定要清空所有课程吗？</h2>
+            <p class="modal-subtitle">
+                将删除你课表里的<strong>全部课程</strong>（同学的课表不受影响）。清空后无法恢复，只能重新录入。
+            </p>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeClearModal()">取消</button>
+                <button type="button" class="btn btn-danger" onclick="submitClearForm()">确定清空</button>
+            </div>
+        </div>
+    </div>
+
+    {# ===== 4. 使用教程（顶部「❓ 使用教程」打开；纯说明，不提交任何表单） =====
+         内容：个性化主题 / 三种加课方式 / 周次切换 / 串门看课表 / 换头像 /
+         添加到手机主屏幕 / 安装到电脑桌面 #}
+    <div class="modal-backdrop" id="tutorial-modal" hidden>
+        <div class="modal modal--tutorial" role="dialog" aria-modal="true"
+             aria-labelledby="tutorial-modal-title">
+            <div class="tutorial-head">
+                <h2 id="tutorial-modal-title">❓ 使用教程</h2>
+                <button type="button" class="modal-close" onclick="closeTutorialModal()"
+                        aria-label="关闭教程">×</button>
+            </div>
+
+            <p class="modal-subtitle">
+                个性化主题、三种加课方式、周次切换、串门看课表，以及怎么把它变成手机 / 电脑上的「App」。
+                关掉以后随时点右上角的「❓ 使用教程」都能再打开。
+            </p>
+
+            <div class="tutorial-body">
+                <section class="tutorial-section tutorial-section--theme">
+                    <h3><span class="tutorial-index">1</span>个性化主题</h3>
+                    <p>点页面右上角的「<strong>⚙️ 切换主题</strong>」按钮，可以在两种风格之间自由切换：</p>
+                    <ul class="tutorial-steps">
+                        <li><strong>清爽毛玻璃</strong>：默认主题，浅色流体渐变背景 + 半透明玻璃卡片（橙 × 蓝）。</li>
+                        <li><strong>终末地工业风</strong>：深灰黑底 + 细密工业网格，荧光黄 / 工业橙作强调色，
+                            直角切角卡片，字体换成硬朗的等宽字体，按钮和边框都带高亮线条。</li>
+                    </ul>
+                    <p class="tutorial-note">
+                        选择会记在这台设备的浏览器里（localStorage）：刷新页面、下次再打开都还是上次的风格；
+                        换设备、换浏览器或清理浏览器数据后会回到默认的清爽毛玻璃。
+                    </p>
+                </section>
+
+                <section class="tutorial-section">
+                    <h3><span class="tutorial-index">2</span>点格子加课（最快）</h3>
+                    <ol class="tutorial-steps">
+                        <li>在课表里找到空白格子（第几节 × 星期几），<strong>点一下</strong>。</li>
+                        <li>依次填写：课程名 → 开始节次 / 结束节次（单节课两个选一样，连堂课选 1 和 2）→ 地点（可以留空）→ 周数（直接回车就是 1-16 周）。</li>
+                        <li>填完自动保存，格子里马上出现课程卡片；卡片右上角的 ✏️ 可以修改，× 可以删除。</li>
+                    </ol>
+                </section>
+
+                <section class="tutorial-section">
+                    <h3><span class="tutorial-index">3</span>AI 文本批量加课</h3>
+                    <p>在「批量粘贴添加课程」里一次粘贴多门课（一行一门），AI 会自动识别星期、节次和周数。</p>
+                    <p class="tutorial-example">
+                        周一上午1-2节高数<br>
+                        周三下午5-6节英语 @外语楼B203<br>
+                        周五 1-16单周 晚上9-10节 选修
+                    </p>
+                    <p class="tutorial-note">节次规则：上午 1~4 节、下午 5~8 节、晚上 9~11 节，所以「下午第二节」= 第 6 节；写成「1-2节」会自动合并成一张跨两节的卡片。</p>
+                </section>
+
+                <section class="tutorial-section">
+                    <h3><span class="tutorial-index">4</span>截图识别</h3>
+                    <ol class="tutorial-steps">
+                        <li>在「上传课表截图一键解析」里选一张截图。超长截图也没关系：网页会先自动压缩成<strong>宽 1200px 的 JPEG</strong> 再上传，识别更准。</li>
+                        <li>等 10~20 秒，页面下方会出现「识别结果确认」表格。</li>
+                        <li>核对每一门课：识别错的行点 × 删掉，填错的地方直接改，最后点「确认保存」才真正写进课表。</li>
+                    </ol>
+                </section>
+
+                <section class="tutorial-section">
+                    <h3><span class="tutorial-index">5</span>切换周次 & 串门看课表</h3>
+                    <ul class="tutorial-steps">
+                        <li><strong>切换周次</strong>：拖动「当前周次」滑块（1~20 周）。打开页面会自动停在按开学日期算出的本周；勾选「显示所有周次」就不过滤，所有课程都显示。</li>
+                        <li><strong>串门</strong>：点「🚪 去看『同学A』的课表」按钮，打开的是对方的<strong>只读</strong>课表，那边没有任何修改入口；看完点「回我的课表」就回来。</li>
+                        <li><strong>分享</strong>：「只读分享链接」发给同学最安全，对方只能看；「专属免密链接」等于你的密码，别随手发给只想看看的同学。</li>
+                    </ul>
+                </section>
+
+                <section class="tutorial-section">
+                    <h3><span class="tutorial-index">6</span>换头像</h3>
+                    <p>点身份栏左边的小头像就能选图片（2MB 以内，JPG / PNG / GIF / WebP），上传完立刻生效，不用刷新页面。</p>
+                </section>
+
+                <section class="tutorial-section tutorial-section--install">
+                    <h3><span class="tutorial-index">7</span>添加到手机主屏幕（像 App 一样用）</h3>
+                    <p class="tutorial-key">小提示：添加时最好用你的「专属免密链接」（/?u=你的分享码），这样点开图标就是你的身份，不用再找链接。</p>
+                    <dl class="tutorial-dl">
+                        <dt>📱 iPhone / iPad（Safari）</dt>
+                        <dd>用 Safari 打开网页 → 点底部中间的「分享」按钮 → 在列表里找到「<strong>添加到主屏幕</strong>」→ 改个名字（比如「我的课表」）→ 点「添加」。</dd>
+                        <dt>🤖 安卓（Chrome / Edge）</dt>
+                        <dd>点右上角「⋮」菜单 → 「<strong>添加到主屏幕</strong>」或「安装应用」→ 确认。也可以直接点网页弹出的「安装」提示。</dd>
+                        <dt>💬 在微信 / QQ 里打开的同学</dt>
+                        <dd>先点右上角「…」→「在浏览器打开」，再按上面两步操作。微信内置浏览器不能直接添加。</dd>
+                    </dl>
+                </section>
+
+                <section class="tutorial-section tutorial-section--install">
+                    <h3><span class="tutorial-index">8</span>安装到电脑桌面</h3>
+                    <dl class="tutorial-dl">
+                        <dt>🪟 Windows / 🍎 Mac · Chrome</dt>
+                        <dd>地址栏右侧出现「安装」图标（⊕ 或小显示器）时点它 → 「安装」；没有图标就点「⋮」→「保存并分享」→「<strong>创建快捷方式</strong>」，并勾选「在窗口中打开」。</dd>
+                        <dt>🪟 Windows · Edge</dt>
+                        <dd>点右上角「…」→「应用」→「<strong>将此站点作为应用安装</strong>」；也可以点地址栏里的「应用可用」图标。</dd>
+                        <dt>🍎 Mac · Safari 17 以上</dt>
+                        <dd>菜单栏「文件」→「<strong>添加到程序坞</strong>」，之后从程序坞点开，没有地址栏，和 App 一样。</dd>
+                    </dl>
+                    <p class="tutorial-note">安装出来的窗口本质还是这个网页：断网时打不开，数据也仍然存在这台服务器上。</p>
+                </section>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closeTutorialModal()">我明白了</button>
+            </div>
+        </div>
+    </div>
+
+    {# ================= 这里的 JS 全部用原生 JS ================= #}
+    <script>
+        console.log("JS 已加载");
+
+        // ===== 0. 复制链接（专属免密链接 / 只读链接共用同一个函数）=====
+        // 优先用 navigator.clipboard（localhost 或 https 下可用）；
+        // 局域网 http 访问时它不是安全上下文，就退回到「选中 + execCommand」的老办法。
+        function copyLink(inputId, successText) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(input.value).then(
+                    function () { showLinkTip(successText); },
+                    function () { fallbackCopyLink(input, successText); }
+                );
+            } else {
+                fallbackCopyLink(input, successText);
+            }
+        }
+
+        function fallbackCopyLink(input, successText) {
+            input.select();
+            input.setSelectionRange(0, input.value.length);
+            try {
+                const ok = document.execCommand('copy');
+                showLinkTip(ok ? successText : '复制失败，请手动选中链接复制');
+            } catch (err) {
+                console.error('复制失败：', err);
+                showLinkTip('复制失败，请手动选中链接复制');
+            }
+        }
+
+        function showLinkTip(text) {
+            const tip = document.getElementById('link-tip');
+            if (!tip) return;
+            tip.textContent = text;
+            setTimeout(function () { tip.textContent = ''; }, 2500);
+        }
+
+        // ===== 1. 上传截图前先在前端压缩（提高识图准确率的关键一步）=====
+        // 为什么压：手机截图动辄 2000~3000px 宽、好几 MB，直接丢给视觉模型既慢又容易被缩放到糊；
+        // 先按 Canvas 缩到「最大宽度 1200px」并转成 JPEG（质量 0.9），体积能小一个数量级，
+        // 文字轮廓反而更清楚，智谱识别准确率明显更高。
+        const IMAGE_MAX_WIDTH = 1200;            // 压缩后的最大宽度（px），不会再放大
+        const IMAGE_QUALITY = 0.9;               // JPEG 质量：0.9 兼顾清晰度和体积
+        const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 和后端 MAX_IMAGE_BYTES 保持一致（原图兜底校验）
+
+        // 把字节数写成「1.2 MB」这种人话
+        function formatSize(bytes) {
+            if (bytes == null) return '';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // 上传卡片里的状态行（压缩中 / 已压缩 / 压缩失败）
+        function setImageStatus(text, isError) {
+            const status = document.getElementById('image-status');
+            if (!status) return;
+            status.textContent = text || '';
+            status.classList.toggle('upload-status--error', !!isError);
+        }
+
+        // 选中图片后的即时提示（让用户知道提交时会压缩）
+        function showPickedImage(input) {
+            const file = input.files && input.files[0];
+            if (!file) {
+                setImageStatus('');
+                return;
+            }
+            const overLimit = file.size > IMAGE_MAX_BYTES ? '（原图偏大，压缩后才会发出）' : '';
+            setImageStatus(
+                '已选择：' + file.name + '（' + formatSize(file.size) + '）' + overLimit + '，' +
+                '提交时会自动压缩成宽 ' + IMAGE_MAX_WIDTH + 'px 的 JPEG'
+            );
+        }
+
+        // 用 Canvas 压缩并转成 JPEG；返回 Promise，resolve 出 { file, info }
+        // info 是给用户看的一行说明，例如「2.4 MB → 268 KB，1200×1600」
+        function compressImage(file, maxWidth, quality) {
+            return new Promise(function (resolve, reject) {
+                if (!window.URL || !window.Image) {
+                    reject(new Error('当前浏览器不支持 Canvas 压缩'));
+                    return;
+                }
+
+                const objectUrl = URL.createObjectURL(file);
+                const img = new Image();
+
+                img.onload = function () {
+                    URL.revokeObjectURL(objectUrl);
+
+                    try {
+                        // 只缩小不放大：原图本来就比 1200px 窄时保持原尺寸
+                        const scale = Math.min(1, maxWidth / img.naturalWidth);
+                        const width = Math.max(1, Math.round(img.naturalWidth * scale));
+                        const height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        // PNG 的透明区域转成 JPEG 会变黑，先铺一层白底
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob(function (blob) {
+                            if (!blob) {
+                                reject(new Error('canvas.toBlob 没有返回图片'));
+                                return;
+                            }
+
+                            const name = (file.name || 'schedule').replace(/\.[^.]+$/, '') + '.jpg';
+                            let output;
+                            try {
+                                output = new File([blob], name, {
+                                    type: 'image/jpeg',
+                                    lastModified: Date.now(),
+                                });
+                            } catch (err) {
+                                // 很老的浏览器没有 File 构造器：退回 Blob，并手动补一个文件名
+                                blob.name = name;
+                                output = blob;
+                            }
+
+                            resolve({
+                                file: output,
+                                info: formatSize(file.size) + ' → ' + formatSize(blob.size) +
+                                      '，' + width + '×' + height,
+                            });
+                        }, 'image/jpeg', quality);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+
+                img.onerror = function () {
+                    URL.revokeObjectURL(objectUrl);
+                    reject(new Error('图片解码失败（格式可能不被浏览器支持）'));
+                };
+
+                img.src = objectUrl;
+            });
+        }
+
+        // 把压缩后的文件塞回 <input type="file">，这样表单提交时发的就是压缩后的图
+        function replaceInputFile(input, file) {
+            if (!input || !file) return false;
+            if (typeof DataTransfer === 'undefined') return false;  // 老浏览器不支持，退回原图
+
+            try {
+                const transfer = new DataTransfer();
+                transfer.items.add(file);
+                input.files = transfer.files;
+                return !!(input.files && input.files.length === 1);
+            } catch (err) {
+                console.warn('替换上传文件失败：', err);
+                return false;
+            }
+        }
+
+        // 上传表单的 onsubmit：先拦下这次提交 → 压缩 → 再真正提交
+        // 必须 return false，因为压缩是异步的，不拦下来就会先把原图发出去
+        function handleImageSubmit(form) {
+            if (form.dataset.submitting === '1') return false;  // 正在压缩 / 提交，忽略连点
+
+            const input = form.querySelector('input[type="file"]');
+            const button = form.querySelector('button[type="submit"]');
+            const file = input && input.files && input.files[0];
+            if (!file) return true;   // 没选文件：交给浏览器自己的 required 校验
+
+            form.dataset.submitting = '1';
+            if (button) {
+                button.disabled = true;
+                button.textContent = '正在压缩图片…';
+            }
+            setImageStatus('正在把图片压缩成宽 ' + IMAGE_MAX_WIDTH + 'px 的 JPEG…');
+
+            // 压缩成功 → 用压缩后的文件提交；压缩失败 → 退回原图提交（后端还会再校验大小）
+            compressImage(file, IMAGE_MAX_WIDTH, IMAGE_QUALITY)
+                .then(function (result) {
+                    if (result && result.file && replaceInputFile(input, result.file)) {
+                        setImageStatus('已压缩：' + result.info + '，正在上传识别…');
+                    } else {
+                        setImageStatus('图片压缩失败，改为上传原图（' + formatSize(file.size) + '）…', true);
+                    }
+                    if (button) button.textContent = '识别中，请稍候…';
+                    form.submit();   // 直接提交，不再触发 onsubmit
+                })
+                .catch(function (err) {
+                    console.warn('图片压缩失败，改为上传原图：', err);
+                    setImageStatus('图片压缩失败，改为上传原图（' + formatSize(file.size) + '）…', true);
+                    if (button) button.textContent = '识别中，请稍候…';
+                    form.submit();
+                });
+
+            return false;
+        }
+
+        // 浏览器「后退」回到这一页（bfcache）时，上传按钮可能还是禁用状态，这里恢复一下，
+        // 否则用户会看到一个灰掉的「识别中，请稍候…」按钮，以为页面坏了
+        window.addEventListener('pageshow', function (event) {
+            if (!event.persisted) return;
+            document.querySelectorAll('form[data-submitting="1"]').forEach(function (form) {
+                delete form.dataset.submitting;
+                const button = form.querySelector('button[type="submit"]');
+                if (button) {
+                    button.disabled = false;
+                    button.textContent = '上传并识别';
+                }
+            });
+        });
+
+        // ===== 2. 删除课程：第一次点变成「确认删除?」，第二次点才真删 =====
+        // 故意不用 confirm()：某些环境（含弹窗被拦截的浏览器）会静默忽略弹窗，
+        // 那样点删除就完全没反应了，改成按钮自己两步确认更稳。
+        async function deleteCourse(button) {
+            if (button.dataset.armed !== '1') {
+                button.dataset.armed = '1';
+                button.textContent = '确认删除?';
+                button.classList.add('armed');
+                setTimeout(function () { resetDeleteButton(button); }, 3000);  // 3 秒不点就复原
+                return;
+            }
+
+            button.disabled = true;  // 防止连点删两次
+            try {
+                const resp = await fetch(`/delete/${button.dataset.id}`, { method: 'POST' });
+                if (resp.ok) {
+                    location.reload();
+                    return;
+                }
+                console.warn('删除失败，HTTP 状态：', resp.status);
+            } catch (err) {
+                console.error('删除请求失败：', err);
+            }
+
+            button.disabled = false;
+            button.textContent = '失败';
+            button.classList.add('armed');
+            setTimeout(function () { resetDeleteButton(button); }, 1500);
+        }
+
+        function resetDeleteButton(button) {
+            if (button.dataset.armed === '' && button.textContent === '×') return;
+            button.dataset.armed = '';
+            button.disabled = false;
+            button.textContent = '×';
+            button.classList.remove('armed');
+        }
+
+        // ===== 3. 点击空白格子直接加课 =====
+        // 先把所有空白格子取出来，数一数有几个（F12 控制台里能看到）
+        const emptyCells = document.querySelectorAll('.empty-cell');
+        console.log('找到空白格子数量：', emptyCells.length);
+
+        emptyCells.forEach(function (cell) {
+            cell.title = '点击添加课程';
+
+            cell.addEventListener('click', function () {
+                // this 就是被点击的那个 td，dataset 对应 data-weekday / data-period
+                const weekday = this.dataset.weekday;          // 星期几：1~7
+                const period = Number(this.dataset.period);    // 开始节次：1~11
+                const weekdayText = this.dataset.weekdayText;  // 星期一…星期日，只用来提示
+
+                console.log('点击了格子：', weekdayText, '第', period, '节');
+
+                // prompt 有可能被浏览器静默屏蔽（立刻返回 null），这里顺便判断一下
+                const startedAt = Date.now();
+                const name = prompt(`在「${weekdayText}」第 ${period} 节添加课程，课程名：`);
+                const promptDisabled = name === null && Date.now() - startedAt < 30;
+
+                if (promptDisabled) {
+                    // 兜底：改用格子里的内联输入框，功能照样能用
+                    console.warn('prompt() 被当前环境屏蔽了，已改用格子内输入框');
+                    showCellInput(this);
+                    return;
+                }
+
+                console.log('输入的课程名：', name);
+                if (!name || !name.trim()) return;  // 点了取消或者没填内容
+
+                // 第二步：结束节次。默认就是当前格子的单节，连堂课再改成后面的节次
+                const endInput = prompt(
+                    `结束节次（单节填 ${period}；连堂课可填 ${Math.min(period + 1, NUM_PERIODS)}，最大 ${NUM_PERIODS}）：`,
+                    String(period)
+                );
+                if (endInput === null) return;      // 点了取消，整次操作放弃
+                let endPeriod = parseInt(endInput, 10);
+                if (!Number.isFinite(endPeriod)) endPeriod = period;
+                endPeriod = Math.min(NUM_PERIODS, Math.max(period, endPeriod));
+
+                const location = prompt('上课地点（可以留空）：');
+                if (location === null) return;      // 第三步点了取消，整次操作放弃
+
+                // 第四步：周数。预填 1-16，直接回车就是默认值
+                const weeks = prompt('上课周数（例如 1-16、1-8、单周、双周；留空 = 1-16）：', DEFAULT_WEEKS);
+                if (weeks === null) return;         // 点了取消，整次操作放弃
+
+                submitCourse(name.trim(), weekday, period, endPeriod, location.trim(), weeks.trim());
+            });
+        });
+
+        // 开始节次变化时，保证「结束节次」不会小于开始节次（下拉框和编辑弹窗共用）
+        function syncEndPeriod(startSelect, endSelectId) {
+            const endSelect = document.getElementById(endSelectId);
+            if (!startSelect || !endSelect) return;
+
+            const start = Math.min(
+                NUM_PERIODS,
+                Math.max(1, parseInt(startSelect.value, 10) || 1)
+            );
+            if (!endSelect.value || Number(endSelect.value) < start) {
+                endSelect.value = String(start);
+            }
+        }
+
+        // 造一个隐藏表单 POST 到 /add，直接复用后端已有的添加路由
+        function submitCourse(name, weekday, period, endPeriod, location, weeks) {
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = "{{ url_for('add_course') }}";
+            form.style.display = 'none';
+
+            const fields = {
+                name: name,
+                weekday: weekday,
+                period: period,
+                end_period: endPeriod,
+                location: location,
+                weeks: weeks || DEFAULT_WEEKS,
+            };
+            for (const key in fields) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = fields[key];
+                form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // prompt 不可用时：在格子里放一个输入框，回车即保存，Esc 取消
+        function showCellInput(cell) {
+            if (cell.querySelector('.cell-input')) return;  // 已经开着就不重复插入
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'cell-input';
+            input.placeholder = '课程名，回车保存';
+
+            // 有输入框时把「＋」提示藏起来（对应 style.css 的 .empty-cell.has-input）
+            cell.classList.add('has-input');
+
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    const name = input.value.trim();
+                    if (!name) return;
+                    // 兜底输入框没地方填结束节次 / 周数，一律按单节课 + 默认 1-16 周存
+                    submitCourse(
+                        name,
+                        cell.dataset.weekday,
+                        Number(cell.dataset.period),
+                        Number(cell.dataset.period),
+                        '',
+                        DEFAULT_WEEKS
+                    );
+                } else if (event.key === 'Escape') {
+                    input.remove();
+                    cell.classList.remove('has-input');
+                }
+            });
+
+            cell.appendChild(input);
+            input.focus();
+        }
+
+        // ===== 4. 周数切换：纯前端过滤（切周不发请求、不刷新页面）=====
+        // 后端把 weeks 存成 "1-16" / "1-16单" / "2-16双" / "1-8,10-16" / "3" 这种文本，
+        // 这里按同一套规则展开成「这门课到底哪几周上」，再和当前选中的周数对比。
+        const MAX_WEEK = Number({{ max_week }});
+        // 课表固定 11 节（上午 1~4、下午 5~8、晚上 9~11），和后端 NUM_PERIODS 一致
+        const NUM_PERIODS = Number({{ num_periods }});
+        // 后端按真实日期算好的「今天是第几周」（app.py 的 get_current_week()）
+        const DEFAULT_WEEK = Number({{ default_week }});
+        const DEFAULT_WEEKS = {{ default_weeks|tojson }};
+        const DEFAULT_END_WEEK = 16;  // 和后端 DEFAULT_WEEK_END 保持一致
+        const WEEKS_STORAGE_KEY = 'schedule-selected-week';
+
+        // 把周数拉回 1 ~ MAX_WEEK；乱值就退回后端给的默认周次
+        function clampWeek(value) {
+            const week = Number(value);
+            if (!Number.isFinite(week)) return DEFAULT_WEEK;
+            return Math.min(MAX_WEEK, Math.max(1, Math.trunc(week)));
+        }
+
+        // 今天的本地日期 "2026-10-31"，用来判断记住的周数是不是今天的
+        function todayKey() {
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return now.getFullYear() + '-' + month + '-' + day;
+        }
+
+        // 只在「同一天内」沿用上次拖到的周数：换一天打开会重新回到后端算出的当前周，
+        // 不会一直停在上次拖到的位置（localStorage 不可用时安静跳过，不影响使用）。
+        function loadSavedWeek() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(WEEKS_STORAGE_KEY) || 'null');
+                if (saved && saved.date === todayKey() && saved.week != null) {
+                    return clampWeek(saved.week);
+                }
+            } catch (err) {
+                console.warn('读取上次周数失败（不影响使用）：', err);
+            }
+            return null;
+        }
+
+        function saveWeek(week) {
+            try {
+                localStorage.setItem(WEEKS_STORAGE_KEY, JSON.stringify({
+                    week: week,
+                    date: todayKey(),
+                }));
+            } catch (err) {
+                console.warn('记住周数失败（不影响使用）：', err);
+            }
+        }
+
+        // "1-16单" -> {1, 3, 5, ..., 15}；"2-16双" -> {2, 4, ..., 16}
+        function expandWeeks(spec) {
+            const weeks = new Set();
+            let parsedAny = false;
+
+            const text = String(spec == null ? '' : spec)
+                // 全角数字 ０-９ 转半角
+                .replace(/[０-９]/g, function (ch) {
+                    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+                })
+                // 各种连接符和「到 / 至」统一成 -
+                .replace(/[~～—–－至到]/g, '-')
+                // 「第 1 周」「星期一」里的干扰字去掉，只留数字、- 和 单/双
+                .replace(/[周星期\s]/g, '');
+
+            text.split(/[,，、;；\/]+/).forEach(function (segment) {
+                if (!segment) return;
+
+                // 单周 / 双周（两个都写了就当成全周，和后端一致）
+                let parity = '';
+                if (segment.includes('单') && !segment.includes('双')) {
+                    parity = 'odd';
+                } else if (segment.includes('双') && !segment.includes('单')) {
+                    parity = 'even';
+                }
+
+                const numbers = (segment.match(/\d+/g) || [])
+                    .map(Number)
+                    .filter(function (n) { return n >= 1; })
+                    .map(function (n) { return Math.min(n, MAX_WEEK); });
+
+                let start;
+                let end;
+                if (!numbers.length) {
+                    if (!parity) return;            // 这一段没有有效信息
+                    start = 1;                      // 只写了「单周 / 双周」
+                    end = DEFAULT_END_WEEK;
+                } else if (numbers.length === 1) {
+                    start = numbers[0];
+                    end = parity ? Math.max(start, DEFAULT_END_WEEK) : start;
+                } else {
+                    start = Math.min(numbers[0], numbers[1]);
+                    end = Math.max(numbers[0], numbers[1]);
+                }
+
+                parsedAny = true;
+                for (let week = start; week <= end; week++) {
+                    if (parity === 'odd' && week % 2 === 0) continue;
+                    if (parity === 'even' && week % 2 === 1) continue;
+                    weeks.add(week);
+                }
+            });
+
+            // 兜底：完全认不出来（或老数据是空字符串）才按 1~16 周，和后端一致。
+            // 认出了范围但结果为空（例如「18单」）就不回退，避免把非本周的课显示出来。
+            if (!parsedAny) {
+                for (let week = 1; week <= DEFAULT_END_WEEK; week++) weeks.add(week);
+            }
+            return weeks;
+        }
+
+        // 同一段 weeks 文本只解析一次，拖动滑块时不用反复算
+        const weeksCache = new Map();
+
+        function weeksOf(courseBlock) {
+            const spec = courseBlock.dataset.weeks || DEFAULT_WEEKS;
+            if (!weeksCache.has(spec)) {
+                weeksCache.set(spec, expandWeeks(spec));
+            }
+            return weeksCache.get(spec);
+        }
+
+        // 核心过滤：遍历所有课程格子，不属于这一周的加 .week-hidden（CSS 里就是 display:none）。
+        // showAll 为 true（勾了「显示所有周次」）时不做匹配判断，所有课程都显示。
+        function applyWeekFilter(week, showAll) {
+            const target = clampWeek(week);
+            let hidden = 0;
+            let total = 0;
+
+            document.querySelectorAll('.course').forEach(function (courseBlock) {
+                total++;
+                const matched = showAll || weeksOf(courseBlock).has(target);
+                courseBlock.classList.toggle('week-hidden', !matched);
+                if (!matched) hidden++;
+            });
+
+            const label = document.getElementById('week-label');
+            if (label) label.textContent = showAll ? '全部周次' : ('第 ' + target + ' 周');
+
+            const tip = document.getElementById('week-tip');
+            if (tip) {
+                if (showAll) {
+                    tip.textContent = total
+                        ? '（不按周过滤，' + total + ' 门课全部显示）'
+                        : '（还没有课程）';
+                } else {
+                    tip.textContent = hidden
+                        ? '（已隐藏 ' + hidden + ' 门非本周课程，本周共 ' + (total - hidden) + ' 门）'
+                        : '（本周 ' + total + ' 门课全部显示）';
+                }
+            }
+
+            return target;
+        }
+
+        const weekSlider = document.getElementById('week-slider');
+        const showAllToggle = document.getElementById('week-show-all');
+
+        // 当前是否勾了「显示所有周次（不按周过滤）」
+        function isShowingAllWeeks() {
+            return !!(showAllToggle && showAllToggle.checked);
+        }
+
+        // 按「滑块周数 + 复选框状态」刷新课表；勾了全部周次时把滑块置灰（位置保留）
+        function refreshWeekView() {
+            const showAll = isShowingAllWeeks();
+            const week = applyWeekFilter(weekSlider ? weekSlider.value : DEFAULT_WEEK, showAll);
+
+            if (weekSlider) {
+                weekSlider.disabled = showAll;
+                weekSlider.title = showAll
+                    ? '已勾选「显示所有周次」，取消勾选后可拖动'
+                    : '拖动切换周数';
+            }
+            return week;
+        }
+
+        if (weekSlider) {
+            // 默认停在「后端按真实日期算出来的当前周」；
+            // 如果今天已经手动拖过滑块，就沿用今天拖到的那一周（跨天自动回到当前周）。
+            const savedWeek = loadSavedWeek();
+            const selected = savedWeek === null ? clampWeek(DEFAULT_WEEK) : savedWeek;
+
+            weekSlider.value = String(selected);
+            refreshWeekView();
+
+            weekSlider.addEventListener('input', function () {
+                const week = refreshWeekView();
+                saveWeek(week);
+            });
+
+            if (showAllToggle) {
+                showAllToggle.addEventListener('change', refreshWeekView);
+            }
+        }
+        // ===== 5. 模态框的通用开关（修改课程 / 修改昵称 / 清空确认共用）=====
+        // 用 hidden 属性 + CSS 的 .modal-backdrop[hidden] { display: none } 控制显隐；
+        // 打开时锁住背景滚动，关闭时把焦点还给刚才那个按钮，键盘操作更顺手。
+        let lastFocusedElement = null;
+
+        function openModal(backdrop) {
+            if (!backdrop) return;
+            lastFocusedElement = document.activeElement;
+            backdrop.hidden = false;
+            document.body.classList.add('modal-open');
+        }
+
+        function closeModal(backdrop) {
+            if (!backdrop) return;
+            backdrop.hidden = true;
+            document.body.classList.remove('modal-open');
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus();
+            }
+        }
+
+        function openedModal() {
+            return document.querySelector('.modal-backdrop:not([hidden])');
+        }
+
+        // 点遮罩的空白处关闭（点弹窗内部不会关）
+        document.querySelectorAll('.modal-backdrop').forEach(function (backdrop) {
+            backdrop.addEventListener('click', function (event) {
+                if (event.target === backdrop) closeModal(backdrop);
+            });
+        });
+
+        // 按 Esc 关闭当前打开的弹窗
+        document.addEventListener('keydown', function (event) {
+            if (event.key !== 'Escape') return;
+            const opened = openedModal();
+            if (opened) closeModal(opened);
+        });
+
+        // ===== 6. 修改课程弹窗 =====
+        // url_for('edit_course', course_id=0) 生成 "/edit/0"，0 只是占位，
+        // 打开弹窗时换成真实的课程 id，得到 /edit/12 这样的地址。
+        const EDIT_URL_SAMPLE = "{{ url_for('edit_course', course_id=0) }}";
+
+        function openEditModal(button) {
+            const modal = document.getElementById('edit-modal');
+            const form = document.getElementById('edit-form');
+            if (!modal || !form) return;
+
+            const id = button.dataset.id || '';
+            if (!id) return;   // 没有 id 就不打开，避免往 /edit/ 这种无效地址提交
+
+            // data-* 都是 Jinja 转义后写进属性的，直接读文本即可，不用自己拼 HTML
+            document.getElementById('edit-name').value = button.dataset.name || '';
+            document.getElementById('edit-location').value = button.dataset.location || '';
+            // 万一老数据的 weeks 是空字符串，就退回默认的 1-16 周
+            document.getElementById('edit-weeks').value = button.dataset.weeks || DEFAULT_WEEKS;
+            document.getElementById('edit-weekday').value = button.dataset.weekday || '';
+
+            const startPeriod = button.dataset.period || '';
+            document.getElementById('edit-period').value = startPeriod;
+
+            // 结束节次：老数据没有 data-end-period 时按单节课（= 开始节次）显示
+            const endSelect = document.getElementById('edit-end-period');
+            const endPeriod = button.dataset.endPeriod || startPeriod;
+            if (endSelect) {
+                endSelect.value = endPeriod;
+                syncEndPeriod(document.getElementById('edit-period'), 'edit-end-period');
+            }
+
+            const subtitle = document.getElementById('edit-modal-subtitle');
+            if (subtitle) {
+                const start = Number(startPeriod);
+                const end = Number(endSelect ? endSelect.value : startPeriod);
+                const periodText = end > start
+                    ? `第 ${start}-${end} 节`
+                    : `第 ${start || '?'} 节`;
+                subtitle.textContent = (button.dataset.weekdayText || '') + ' ' + periodText;
+            }
+
+            form.action = EDIT_URL_SAMPLE.replace(/0$/, encodeURIComponent(id));
+
+            openModal(modal);
+
+            // 打开就选中课程名：直接打字即可覆盖，不用先手动全选
+            const nameInput = document.getElementById('edit-name');
+            nameInput.focus();
+            nameInput.select();
+        }
+
+        function closeEditModal() {
+            closeModal(document.getElementById('edit-modal'));
+        }
+
+        // ===== 7. 修改昵称弹窗 =====
+        function openNameModal() {
+            const modal = document.getElementById('name-modal');
+            if (!modal) return;
+            openModal(modal);
+
+            const input = document.getElementById('name-input');
+            if (input) {
+                input.focus();
+                input.select();
+            }
+        }
+
+        function closeNameModal() {
+            closeModal(document.getElementById('name-modal'));
+        }
+
+        // ===== 8. 一键清空：先弹确认框，确认后才真正提交表单 =====
+        // 流程：
+        //   点「清空我的课表」(type=submit) → onsubmit 调 askClearConfirm()
+        //     · 还没确认过 → 打开 #clear-modal 并 return false（拦住这次提交）
+        //     · 刚点过「确定清空」→ return true，放行
+        //   点确认框里的「确定清空」→ submitClearForm()：先打上「已确认」标记，再提交表单
+        //
+        // ★ 用独立标记 clearConfirmed 判断「是否已确认」，不要用 modal.hidden：
+        //   提交前必须先把弹窗关掉（hidden = true），如果还拿 hidden 判断，
+        //   这次提交就会又被拦下来，表现就是「点了确定清空，弹窗一闪又回来，什么都没发生」。
+        let clearConfirmed = false;
+
+        function askClearConfirm() {
+            // 用户刚在确认框里点过「确定清空」→ 放行本次提交（标记只生效一次）
+            if (clearConfirmed) {
+                clearConfirmed = false;
+                return true;
+            }
+
+            const modal = document.getElementById('clear-modal');
+            // 万一页面被改过、确认框被删了，就退回浏览器原生 confirm，绝不会「不确认就清空」
+            if (!modal) {
+                return window.confirm('确定要清空所有课程吗？清空后无法恢复。');
+            }
+
+            try {
+                openModal(modal);
+                return false;
+            } catch (err) {
+                // 弹窗打不开（页面结构被改坏等）时兜底：改用原生 confirm，功能不会失效
+                console.error('打开清空确认框失败，改用浏览器原生 confirm：', err);
+                return window.confirm('确定要清空所有课程吗？清空后无法恢复。');
+            }
+        }
+
+        function submitClearForm() {
+            const form = document.getElementById('clear-form');
+            if (!form) {
+                closeClearModal();
+                return;
+            }
+
+            // 先打标记、再关弹窗、最后提交：onsubmit 看到标记就直接放行，不会再弹一次
+            clearConfirmed = true;
+            closeClearModal();
+
+            if (typeof form.requestSubmit === 'function') {
+                // requestSubmit() 会重新走一遍 onsubmit（此时标记已置位，直接提交）
+                form.requestSubmit();
+            } else {
+                // 老浏览器没有 requestSubmit：form.submit() 不触发 onsubmit，直接提交
+                form.submit();
+            }
+
+            // 兜底：万一浏览器因为别的校验没走到 onsubmit，标记不要留着影响下一次点击
+            clearConfirmed = false;
+        }
+
+        function closeClearModal() {
+            closeModal(document.getElementById('clear-modal'));
+        }
+
+        // ===== 9. 使用教程弹窗（纯展示：点 × / 点遮罩 / 按 Esc 都能关）=====
+        // 用的是第 5 节那套通用开关，所以这里只要把两个 id 包一下即可。
+        function openTutorialModal() {
+            openModal(document.getElementById('tutorial-modal'));
+        }
+
+        function closeTutorialModal() {
+            closeModal(document.getElementById('tutorial-modal'));
+        }
+
+        // ===== 10. 换头像：选完图片立刻 fetch 上传，成功后原地换图（不刷新页面）=====
+        const AVATAR_MAX_BYTES = 2 * 1024 * 1024;   // 和后端 MAX_AVATAR_BYTES 保持一致
+
+        function showAvatarTip(text, isError) {
+            const tip = document.getElementById('avatar-tip');
+            if (!tip) return;
+
+            tip.textContent = text || '';
+            tip.classList.toggle('avatar-tip--error', !!isError);
+
+            // 成功提示 4 秒后自动消失；错误提示留着，等用户自己再点一次
+            if (tip.timerId) clearTimeout(tip.timerId);
+            if (text && !isError) {
+                tip.timerId = setTimeout(function () {
+                    tip.textContent = '';
+                }, 4000);
+            }
+        }
+
+        // 把服务端返回的新头像地址塞进头像框（第一次上传时要新建 <img>，替换掉首字母占位）
+        function setAvatarPreview(url) {
+            const wrap = document.getElementById('avatar-wrap');
+            if (!wrap || !url) return;
+
+            let img = document.getElementById('avatar-img');
+            if (!img) {
+                wrap.textContent = '';
+                img = document.createElement('img');
+                img.id = 'avatar-img';
+                img.alt = '我的头像';
+                wrap.appendChild(img);
+            }
+            img.src = url;   // 每次上传文件名都不同，所以不会被浏览器缓存成旧头像
+            wrap.classList.remove('avatar-frame--empty');
+        }
+
+        async function uploadAvatar(form) {
+            const input = document.getElementById('avatar-input');
+            const file = input && input.files && input.files[0];
+            if (!file) return;   // 用户点了取消：什么也不做
+
+            // 先在浏览器里挡一道：类型、大小都不对就不用麻烦服务器了
+            if (!/^image\//.test(file.type || '')) {
+                showAvatarTip('请选一张图片（JPG / PNG / GIF / WebP）', true);
+                input.value = '';
+                return;
+            }
+            if (file.size > AVATAR_MAX_BYTES) {
+                showAvatarTip('这张图有 ' + formatSize(file.size) + '，超过 2MB 上限，换一张小点的吧', true);
+                input.value = '';
+                return;
+            }
+
+            showAvatarTip('正在上传头像…');
+
+            // 只发文件本身，不带任何 user_id —— 身份一律由后端 session 决定
+            const body = new FormData();
+            body.append('avatar', file);
+
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: body,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                const data = await response.json().catch(function () { return null; });
+
+                if (!response.ok || !data || !data.ok) {
+                    const message = (data && data.error) ||
+                        ('上传失败（HTTP ' + response.status + '），请稍后再试');
+                    showAvatarTip(message, true);
+                    return;
+                }
+
+                setAvatarPreview(data.avatar_url);
+                showAvatarTip('头像已更新');
+            } catch (err) {
+                console.error('头像上传失败：', err);
+                showAvatarTip('网络错误，头像没传上去，请稍后再试', true);
+            } finally {
+                input.value = '';   // 清空，这样再选同一张图也能重新触发 change
+            }
+        }
+    </script>
+</body>
+</html>

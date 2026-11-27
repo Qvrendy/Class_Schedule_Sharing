@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    {# 手机浏览器地址栏 / 状态栏颜色：static/theme.js 会在切到终末地风时把它改成 #121212 #}
+    <meta name="theme-color" content="#F7FAFF" id="theme-color-meta">
+    <title>请用专属链接访问</title>
+
+    <!-- 现代无衬线字体：Inter（拉丁）+ Noto Sans SC（中文），加载失败时回退到系统字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+          rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+{# 主题脚本放在 body 最前面：先按上次的选择贴好 .theme-endfield，再渲染内容，
+   这样刷新页面不会先闪一下默认的毛玻璃主题（逻辑见 static/theme.js）。 #}
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+
+<div class="page">
+
+    <header class="page-header">
+        <div class="page-header-text">
+            <p class="page-eyebrow">Class Schedule</p>
+            <h1>请通过专属链接访问</h1>
+            <p class="page-subtitle">
+                直接打开域名不会再默认变成「我」的课表 ——
+                为了避免任何人误入（甚至误改）别人的课表，进入前必须先证明身份。
+            </p>
+        </div>
+
+        {# 这个提示页也能换主题：和首页共用 static/theme.js + localStorage #}
+        <div class="page-header-actions">
+            <button type="button" class="theme-toggle" id="theme-toggle"
+                    onclick="toggleTheme()" aria-pressed="false"
+                    title="当前：清爽毛玻璃 · 点击切换到终末地工业风">
+                <span class="theme-toggle-label">⚙️ 切换主题</span>
+            </button>
+        </div>
+    </header>
+
+    <section class="card">
+        <p class="alert alert-error">请通过带有 ?u=你的专属码 的链接访问课表。</p>
+
+        {# ?u= 里的分享码不存在时，后端会把原因传进来 #}
+        {% if error %}
+            <p class="alert alert-error">{{ error }}</p>
+        {% endif %}
+
+        {# 这里是 GET 表单：提交后地址就是 /?u=你输入的码，和点开专属链接完全等价 #}
+        <form class="manual-form" action="{{ url_for('index') }}" method="get">
+            <div class="form-grid">
+                <label class="field">
+                    <span class="field-label">你的专属码（分享码）</span>
+                    <input type="text" name="u" placeholder="6 位小写字母或数字"
+                           autocomplete="off" autocapitalize="off" spellcheck="false" required>
+                </label>
+            </div>
+            <button type="submit" class="btn">打开我的课表</button>
+        </form>
+
+        <p class="hint">
+            专属免密链接的完整格式是 <code>https://你的域名/?u=你的分享码</code>，
+            它等于你的密码：请只在自己的浏览器里打开，不要发给只想看看课表的同学。<br>
+            只是想看同学的课表？让对方把「只读链接」（<code>/view/对方的分享码</code>）发给你即可，
+            只读页没有任何修改入口。
+        </p>
+    </section>
+
+</div><!-- /.page -->
+
+</body>
+</html>

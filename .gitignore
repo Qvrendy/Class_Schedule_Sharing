@@ -1,0 +1,27 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.secret_key
+*.pem
+*.key
+
+# SQLite databases and backups
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.bak
+
+# Python caches and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors and IDEs
+.vscode/
+.idea/
+
+# Runtime uploads
+static/avatars/

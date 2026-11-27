@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {# 手机浏览器地址栏 / 状态栏颜色：static/theme.js 会在切到终末地风时把它改成 #121212 #}
+    <meta name="theme-color" content="#F7FAFF" id="theme-color-meta">
+    <title>课表（只读）</title>
+
+    <!-- 现代无衬线字体：Inter（拉丁）+ Noto Sans SC（中文），加载失败时回退到系统字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+          rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='ui.js') }}" defer></script>
+</head>
+<body class="readonly-page">
+
+{# 主题脚本放在 body 最前面：先按上次的选择贴好 .theme-endfield，再渲染内容，
+   这样刷新页面不会先闪一下默认的毛玻璃主题（逻辑见 static/theme.js）。 #}
+<script src="{{ url_for('static', filename='theme.js') }}"></script>
+
+<div class="page">
+
+    <header class="page-header">
+        <div class="page-header-text">
+            <p class="page-eyebrow">Share · Read Only</p>
+            <h1>{{ owner['username'] }}的课表</h1>
+            <p class="readonly-tip">
+                只读页 · 可以查看，不能修改（这个页面没有任何表单、上传或删除入口）
+                {% if is_own %}（这是你自己的课表，回首页才能编辑）{% endif %}
+            </p>
+        </div>
+
+        {# 只读页也能换主题：和首页共用 static/theme.js + localStorage #}
+        <div class="page-header-actions">
+            <button type="button" class="theme-toggle" id="theme-toggle"
+                    onclick="toggleTheme()" aria-pressed="false"
+                    title="当前：清爽毛玻璃 · 点击切换到终末地工业风">
+                <span class="theme-toggle-label">⚙️ 切换主题</span>
+            </button>
+        </div>
+    </header>
+
+    {# 身份提示：viewer 只来自浏览器 session（用 /?u=<share_code> 打开过首页才有值）。
+       这里只显示「你是谁」，绝不显示 owner 的专属免密链接 ——
+       否则只读链接就变成了可编辑链接，别人拿到就能改 owner 的课表。
+
+       「回首页」链接一律用后端算好的 home_url，也就是 /?u=<访问者自己的 share_code>，
+       绝对不写成裸链接 /：裸链接在 session 为空时会被首页默认绑成第一个用户「我」，
+       只是来看课表的同学点一下，就拿到了「我」的编辑权限（能删能改）。
+       没有绑定身份（viewer 为空）时，干脆不给任何「回首页」链接。 #}
+    <section class="card viewer-card">
+        <p class="viewer-tip">
+            {% if is_own %}
+                {# 自己看自己的只读页：回首页编辑，链接绑的是自己 #}
+                当前身份：<strong>{{ viewer['username'] }}</strong>
+                · <a href="{{ home_url }}">← 回首页编辑</a>
+            {% elif viewer %}
+                {# 看的是别人的只读页：只回「我的课表」，链接绑的是访问者自己，不是 owner #}
+                当前身份：<strong>{{ viewer['username'] }}</strong>
+                · <a href="{{ home_url }}">← 回我的课表</a>
+            {% else %}
+                {# 未绑定身份：不提供回首页入口，避免被默认绑成「我」 #}
+                当前身份：<strong>未绑定</strong>（只读浏览，没有编辑权限）
+                · 想管理自己的课表，请用你自己的专属免密链接（<code>/?u=你的免密码</code>）打开首页
+            {% endif %}
+        </p>
+    </section>
+
+    {# 周数切换：纯前端过滤，切周不会请求后端。
+       默认值 default_week 是后端按真实日期算出的「今天是第几周」（见 app.py 的
+       get_current_week()），打开页面直接停在本周；
+       勾选「显示所有周次」后脚本取消过滤，所有课程都显示。 #}
+    <section id="week-bar" class="card card--compact">
+        <strong class="week-title">当前周次</strong>
+        <input type="range" id="week-slider" min="1" max="{{ max_week }}" value="{{ default_week }}" step="1"
+               title="拖动切换周数">
+        <span id="week-label">第 {{ default_week }} 周</span>
+
+        {# 勾上就不按周过滤：不管课程属于哪几周，全部显示出来 #}
+        <label class="week-toggle" for="week-show-all">
+            <input type="checkbox" id="week-show-all">
+            <span>显示所有周次（不按周过滤）</span>
+        </label>
+
+        <span id="week-tip"></span>
+    </section>
+
+    <!-- 第 1 列是节次，后面 7 列是星期一到星期日；
+         手机屏幕窄，外面包一层 .schedule-wrap 横向滚动，不撑坏页面 -->
+    <p class="scroll-hint">← 左右滑动查看完整课表 →</p>
+    {% from "_schedule_grid.html" import schedule_grid %}
+    {{ schedule_grid(courses, weekdays, period_rows, lunch_row, num_periods, lunch_after_period, editable=False) }}
+
+</div><!-- /.page -->
+
+    <script>
+        // ===== 周数切换：纯前端过滤（只读页不会请求后端）=====
+        // weeks 文本的格式和后端 normalize_weeks() 一致：
+        //   "1-16" / "1-16单" / "2-16双" / "1-8,10-16" / "3"
+        const MAX_WEEK = Number({{ max_week }});
+        // 后端按真实日期算好的「今天是第几周」（app.py 的 get_current_week()）
+        const DEFAULT_WEEK = Number({{ default_week }});
+        const DEFAULT_WEEKS = {{ default_weeks|tojson }};
+        const DEFAULT_END_WEEK = 16;  // 和后端 DEFAULT_WEEK_END 保持一致
+
+        // 把周数拉回 1 ~ MAX_WEEK；乱值就退回后端给的默认周次
+        function clampWeek(value) {
+            const week = Number(value);
+            if (!Number.isFinite(week)) return DEFAULT_WEEK;
+            return Math.min(MAX_WEEK, Math.max(1, Math.trunc(week)));
+        }
+
+        // "1-16单" -> {1, 3, 5, ..., 15}；"2-16双" -> {2, 4, ..., 16}
+        function expandWeeks(spec) {
+            const weeks = new Set();
+            let parsedAny = false;
+
+            const text = String(spec == null ? '' : spec)
+                .replace(/[０-９]/g, function (ch) {          // 全角数字转半角
+                    return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+                })
+                .replace(/[~～—–－至到]/g, '-')              // 连接符统一成 -
+                .replace(/[周星期\s]/g, '');                 // 去掉「周 / 星期」等干扰字
+
+            text.split(/[,，、;；\/]+/).forEach(function (segment) {
+                if (!segment) return;
+
+                let parity = '';
+                if (segment.includes('单') && !segment.includes('双')) {
+                    parity = 'odd';
+                } else if (segment.includes('双') && !segment.includes('单')) {
+                    parity = 'even';
+                }
+
+                const numbers = (segment.match(/\d+/g) || [])
+                    .map(Number)
+                    .filter(function (n) { return n >= 1; })
+                    .map(function (n) { return Math.min(n, MAX_WEEK); });
+
+                let start;
+                let end;
+                if (!numbers.length) {
+                    if (!parity) return;
+                    start = 1;
+                    end = DEFAULT_END_WEEK;
+                } else if (numbers.length === 1) {
+                    start = numbers[0];
+                    end = parity ? Math.max(start, DEFAULT_END_WEEK) : start;
+                } else {
+                    start = Math.min(numbers[0], numbers[1]);
+                    end = Math.max(numbers[0], numbers[1]);
+                }
+
+                parsedAny = true;
+                for (let week = start; week <= end; week++) {
+                    if (parity === 'odd' && week % 2 === 0) continue;
+                    if (parity === 'even' && week % 2 === 1) continue;
+                    weeks.add(week);
+                }
+            });
+
+            if (!parsedAny) {
+                for (let week = 1; week <= DEFAULT_END_WEEK; week++) weeks.add(week);
+            }
+            return weeks;
+        }
+
+        const weeksCache = new Map();
+
+        function weeksOf(courseBlock) {
+            const spec = courseBlock.dataset.weeks || DEFAULT_WEEKS;
+            if (!weeksCache.has(spec)) {
+                weeksCache.set(spec, expandWeeks(spec));
+            }
+            return weeksCache.get(spec);
+        }
+
+        // 不属于这一周的课程加 .week-hidden（CSS：display:none）。
+        // showAll 为 true（勾了「显示所有周次」）时不做匹配判断，所有课程都显示。
+        function applyWeekFilter(week, showAll) {
+            const target = clampWeek(week);
+            let hidden = 0;
+            let total = 0;
+
+            document.querySelectorAll('.course').forEach(function (courseBlock) {
+                total++;
+                const matched = showAll || weeksOf(courseBlock).has(target);
+                courseBlock.classList.toggle('week-hidden', !matched);
+                if (!matched) hidden++;
+            });
+
+            const label = document.getElementById('week-label');
+            if (label) label.textContent = showAll ? '全部周次' : ('第 ' + target + ' 周');
+
+            const tip = document.getElementById('week-tip');
+            if (tip) {
+                if (showAll) {
+                    tip.textContent = total
+                        ? '（不按周过滤，' + total + ' 门课全部显示）'
+                        : '（还没有课程）';
+                } else {
+                    tip.textContent = hidden
+                        ? '（已隐藏 ' + hidden + ' 门非本周课程，本周共 ' + (total - hidden) + ' 门）'
+                        : '（本周 ' + total + ' 门课全部显示）';
+                }
+            }
+
+            return target;
+        }
+
+        const weekSlider = document.getElementById('week-slider');
+        const showAllToggle = document.getElementById('week-show-all');
+
+        // 当前是否勾了「显示所有周次（不按周过滤）」
+        function isShowingAllWeeks() {
+            return !!(showAllToggle && showAllToggle.checked);
+        }
+
+        // 按「滑块周数 + 复选框状态」刷新课表；勾了全部周次时把滑块置灰（位置保留）
+        function refreshWeekView() {
+            const showAll = isShowingAllWeeks();
+            const week = applyWeekFilter(weekSlider ? weekSlider.value : DEFAULT_WEEK, showAll);
+
+            if (weekSlider) {
+                weekSlider.disabled = showAll;
+                weekSlider.title = showAll
+                    ? '已勾选「显示所有周次」，取消勾选后可拖动'
+                    : '拖动切换周数';
+            }
+            return week;
+        }
+
+        if (weekSlider) {
+            // 只读页不做本地记忆：每次打开都回到后端算出的当前周
+            weekSlider.value = String(clampWeek(DEFAULT_WEEK));
+            refreshWeekView();
+
+            weekSlider.addEventListener('input', function () {
+                refreshWeekView();
+            });
+
+            if (showAllToggle) {
+                showAllToggle.addEventListener('change', refreshWeekView);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+{# ===== 课表 Grid 组件（首页和只读分享页共用）=====
+   为什么用 CSS Grid 而不是 <table>：
+     1) 连堂课（第 1-2 节）需要一张卡片跨两行，table 只能用 rowspan，改起来很麻烦；
+     2) 左边节次 / 时间列可以用 position: sticky，手机横向滚动时始终固定在左边；
+     3) 空白格子和课程卡片可以互相重叠（卡片盖在背景格子上），点击判定更好写。
+
+   行结构固定为：第 1 行表头 → 上午 1~4 节 → 「中午」分割行 → 下午/晚上 5~11 节。
+   - 背景：11 × 7 个 .empty-cell（点一下就能在该位置加课）
+   - 前景：每门课一张 .course，按 grid_row / grid_span 跨行显示
+
+   参数：
+     courses             后端 load_schedule() 返回的课程列表（已带 grid_row / grid_span / lane）
+     weekdays            星期一到星期日
+     period_rows         后端 PERIOD_ROWS（节次 + 起止时间 + grid_row）
+     lunch_row           「中午」行的行号
+     num_periods         总节次（11）
+     lunch_after_period  第几节之后插入中午（4）
+     editable            True = 首页（显示 ✏️ / × 按钮），False = 只读分享页
+#}
+{% macro schedule_grid(courses, weekdays, period_rows, lunch_row, num_periods, lunch_after_period, editable=False) %}
+<div class="table-wrap schedule-wrap">
+    <div class="schedule-grid"
+         style="--period-count: {{ num_periods }}; grid-template-rows: 44px repeat({{ lunch_after_period }}, var(--slot-h)) var(--lunch-h) repeat({{ num_periods - lunch_after_period }}, var(--slot-h));">
+
+        {# ---- 表头：第 1 行 ---- #}
+        <div class="grid-corner" style="grid-column: 1; grid-row: 1;">节次</div>
+        {% for weekday in weekdays %}
+            <div class="day-head" style="grid-column: {{ loop.index + 1 }}; grid-row: 1;">{{ weekday }}</div>
+        {% endfor %}
+
+        {# ---- 背景：时间轴 + 空白格子（课程卡片会盖在对应格子上）---- #}
+        {% for row in period_rows %}
+            {# 第 4 节结束、第 5 节开始之前插入「中午」分割行 #}
+            {% if row.number == lunch_after_period + 1 %}
+                <div class="lunch-axis" style="grid-column: 1; grid-row: {{ lunch_row }};">中午</div>
+                {% for weekday in weekdays %}
+                    <div class="lunch-cell" style="grid-column: {{ loop.index + 1 }}; grid-row: {{ lunch_row }};"></div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="period-axis" style="grid-column: 1; grid-row: {{ row.grid_row }};">
+                <span class="period-number">{{ row.number }}</span>
+                <span class="period-time">{{ row.start }}<br>{{ row.end }}</span>
+            </div>
+
+            {% for weekday in weekdays %}
+                {% set day = loop.index %}
+                <div class="empty-cell"
+                     style="grid-column: {{ day + 1 }}; grid-row: {{ row.grid_row }};"
+                     data-weekday="{{ day }}"
+                     data-weekday-text="{{ weekday }}"
+                     data-period="{{ row.number }}"
+                     title="点击在{{ weekday }}第 {{ row.number }} 节添加课程"></div>
+            {% endfor %}
+        {% endfor %}
+
+        {# ---- 课程卡片：同一天时间冲突的课用 --lane / --lanes 并排，不互相盖住 ----
+            手机端（style.css 的「13.1 手机端课表」）会隐藏「第 x-y 节」这一行、
+            把过长的地点做成省略号，并把右上角两个按钮缩到 16px 贴住卡片角；
+            并排的课程卡片更窄，额外挂一个 .course--crowded 再瘦一档。
+            卡片整体再带一个 title：桌面悬停 / 长按就能看到没显示全的信息。 #}
+        {% for course in courses %}
+            <div class="course{% if course.end_period > course.period %} course--block{% endif %}{% if course.lanes > 1 %} course--crowded{% endif %}{% if editable %} course--editable{% endif %}"
+                 style="grid-column: {{ course.grid_column }}; grid-row: {{ course.grid_row }} / span {{ course.grid_span }}; --lane: {{ course.lane }}; --lanes: {{ course.lanes }};"
+                 data-name="{{ course.name }}"
+                 data-weeks="{{ course.weeks }}"
+                 title="{{ course.name }} · 第 {{ course.period }}{% if course.end_period > course.period %}-{{ course.end_period }}{% endif %} 节{% if course.location %} · @ {{ course.location }}{% endif %} · {{ course.weeks|format_weeks }}">
+                <div class="course-name">{{ course.name }}</div>
+                <div class="course-period">
+                    {% if course.end_period > course.period %}
+                        (第 {{ course.period }}-{{ course.end_period }} 节)
+                    {% else %}
+                        (第 {{ course.period }} 节)
+                    {% endif %}
+                </div>
+                {% if course.location %}
+                    <div class="course-location">@ {{ course.location }}</div>
+                {% endif %}
+                <div class="course-weeks">{{ course.weeks|format_weeks }}</div>
+
+                {% if editable %}
+                    {# 右上角两个小按钮：✏️ 修改（弹窗） + × 删除。
+                       data-* 里放的是这一条课程的现有值，openEditModal() 直接填进模态框；
+                       提交地址是 /edit/<id>，后端还会用 session 里的身份再校验一次。 #}
+                    <div class="course-actions">
+                        <button type="button" class="edit-btn"
+                                title="修改这门课"
+                                aria-label="修改课程：{{ course.name }}"
+                                data-id="{{ course.id }}"
+                                data-name="{{ course.name }}"
+                                data-location="{{ course.location }}"
+                                data-weeks="{{ course.weeks }}"
+                                data-weekday="{{ course.weekday }}"
+                                data-weekday-text="{{ weekdays[course.weekday - 1] }}"
+                                data-period="{{ course.period }}"
+                                data-end-period="{{ course.end_period }}"
+                                onclick="openEditModal(this)">✏️</button>
+                        <button type="button" class="delete-btn"
+                                title="删除这门课"
+                                aria-label="删除课程：{{ course.name }}"
+                                data-id="{{ course.id }}"
+                                data-name="{{ course.name }}"
+                                onclick="deleteCourse(this)">×</button>
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endmacro %}
